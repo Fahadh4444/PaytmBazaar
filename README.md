@@ -84,7 +84,9 @@ fixed sentence. This matters more than the visual city.
 
 ## Documentation
 
-- [Architecture](docs/architecture.md) — boundaries, data flow, privacy
+- [Architecture](docs/architecture.md) — boundaries, data flow, intelligence layer, privacy
+- [End-to-end flow](docs/flow.md) — Landing → City → Bazaar → Merchant Dialog → action → learning (planned)
+- [Planned API contract](docs/api.md) — proposed endpoints, not yet implemented
 - [M2M engine principles](docs/m2m-engine.md) — what the engine may and may not do
 - [Provider strategy](docs/providers.md) — external integrations and failure handling
 - [Local development](docs/development.md) — setup, scripts, branching, parallel work

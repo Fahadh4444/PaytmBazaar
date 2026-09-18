@@ -61,6 +61,18 @@ Action orchestration, after intelligence and after merchant approval:
 insight  →  recommendation  →  merchant approves  →  n8n  →  action  →  outcome
 ```
 
+n8n is the action / orchestration layer, not only a notification mechanism.
+It can also be triggered directly from the merchant's private experience:
+
+```
+Indirect:  opportunity  →  recommendation  →  approval  →  n8n
+Direct:    merchant  →  action  →  n8n
+```
+
+After execution, the outcome is measured and stored in Cognee as future
+context. See [architecture.md](architecture.md#n8n--action--orchestration-layer)
+and the planned `/api/merchant/{id}/workflows` endpoints in [api.md](api.md).
+
 The M2M algorithm does not move into n8n. Workflows execute business actions;
 the application owns the intelligence.
 

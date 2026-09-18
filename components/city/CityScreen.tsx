@@ -6,8 +6,9 @@ import { useRouter } from "next/navigation";
 import { bazaars, type Bazaar } from "@/data/bazaars";
 
 import BazaarActions, { type ActionsPlacement } from "./BazaarActions";
-import BazaarAnalysisDialog from "./BazaarAnalysisDialog";
+import AnalysisDialog from "./AnalysisDialog";
 import BazaarRegions from "./BazaarRegions";
+import CityRock from "./CityRock";
 import CityEnvironment, { PLATE_H, PLATE_W } from "./CityEnvironment";
 import CityHeader from "./CityHeader";
 import MapControls from "./MapControls";
@@ -46,6 +47,7 @@ export default function CityScreen() {
   const [activeId, setActiveId] = useState<string | null>(null);
   const [placement, setPlacement] = useState<ActionsPlacement | null>(null);
   const [analyzing, setAnalyzing] = useState<Bazaar | null>(null);
+  const [cityAnalysis, setCityAnalysis] = useState(false);
   const [leaving, setLeaving] = useState(false);
   const [diving, setDiving] = useState(false);
   const exitTimer = useRef<number | undefined>(undefined);
@@ -306,6 +308,7 @@ export default function CityScreen() {
             onEnter={openActions}
             onLeave={scheduleClose}
           />
+          <CityRock onOpen={() => setCityAnalysis(true)} />
         </div>
       </div>
 
@@ -335,11 +338,22 @@ export default function CityScreen() {
         <div className={styles.departWash} />
       </div>
 
-      <BazaarAnalysisDialog
-        bazaar={analyzing}
+      <AnalysisDialog
+        eyebrow="Bazaar Analysis"
+        title={analyzing ? analyzing.name : "Bazaar"}
+        lede="This is the window the M2M engine reports into. It will read the Bazaar's activity under the contextual state below."
         context={context}
         open={analyzing !== null}
         onClose={() => setAnalyzing(null)}
+      />
+
+      <AnalysisDialog
+        eyebrow="City Analysis"
+        title="Bengaluru"
+        lede="Every Bazaar in the city, read together. The M2M engine will report here on the network as a whole, under the contextual state below."
+        context={context}
+        open={cityAnalysis}
+        onClose={() => setCityAnalysis(false)}
       />
     </main>
   );

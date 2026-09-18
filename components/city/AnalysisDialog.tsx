@@ -1,32 +1,38 @@
 "use client";
 
-import type { Bazaar } from "@/data/bazaars";
 import SceneDialog from "@/components/bazaar/SceneDialog";
 
 import type { CityContext } from "./context";
 import { formatHour } from "./context";
 import styles from "./city.module.css";
 
-type BazaarAnalysisDialogProps = {
-  bazaar: Bazaar | null;
+type AnalysisDialogProps = {
+  /** What is being analysed: "Bazaar Analysis", "City Analysis". */
+  eyebrow: string;
+  title: string;
+  /** One line saying what the analysis will read. */
+  lede: string;
   context: CityContext;
   open: boolean;
   onClose: () => void;
 };
 
 /**
- * The window the M2M engine will eventually open onto a Bazaar.
+ * The window the M2M engine will eventually report into, for a single Bazaar
+ * or for the whole city.
  *
- * Intentionally empty. It shows which Bazaar and which contextual state the
- * analysis would run against, and nothing else — no numbers are invented here,
+ * Intentionally empty. It shows what is being analysed and the contextual
+ * state it would run under, and nothing else — no numbers are invented here,
  * because none have been computed.
  */
-export default function BazaarAnalysisDialog({
-  bazaar,
+export default function AnalysisDialog({
+  eyebrow,
+  title,
+  lede,
   context,
   open,
   onClose,
-}: BazaarAnalysisDialogProps) {
+}: AnalysisDialogProps) {
   const inputs: Array<[string, string]> = [
     ["Time", formatHour(context.hour)],
     ["Day", context.day],
@@ -35,18 +41,10 @@ export default function BazaarAnalysisDialog({
   ];
 
   return (
-    <SceneDialog
-      open={open}
-      onClose={onClose}
-      eyebrow="Bazaar Analysis"
-      title={bazaar ? bazaar.name : "Bazaar"}
-    >
+    <SceneDialog open={open} onClose={onClose} eyebrow={eyebrow} title={title}>
       <hr className={styles.dialogRule} />
 
-      <p className={styles.dialogLede}>
-        This is the window the M2M engine reports into. It will read the Bazaar&apos;s
-        activity under the contextual state below.
-      </p>
+      <p className={styles.dialogLede}>{lede}</p>
 
       <dl className={styles.inputs}>
         {inputs.map(([label, value]) => (

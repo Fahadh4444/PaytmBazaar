@@ -69,7 +69,9 @@ to be remembered later. An aggregate over three merchants is not anonymous.
 ## What is not built yet
 
 Cohorting, aggregation, comparison, pattern detection, relevance scoring — none
-of it exists yet, and no files are stubbed out for it.
+of it exists yet, and no files are stubbed out for it. The agreed set of planned
+components (Merchant Metrics through Opportunity Engine) is listed in
+[architecture.md](architecture.md#intelligence-layer-components).
 
 The engine's **output contract** is also deliberately undefined. Writing a
 `NetworkInsight` interface before a real pattern has been computed would mean

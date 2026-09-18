@@ -80,6 +80,161 @@ A request uses only the layers it needs. A numeric comparison does not call an
 LLM. A database read does not call Cognee. A recommendation with no external
 effect does not call n8n.
 
+## Backend intelligence flow (agreed design)
+
+> **Status: planned, not implemented.** This is the finalized target flow. The
+> user-facing journey is in [flow.md](flow.md); the endpoint contract is in
+> [api.md](api.md) (Planned API Contract).
+
+```
+Synthetic Paytm-like Data
+        ↓
+Data Adapter                 lib/paytm
+        ↓
+Data Normalization
+        ↓
+Intelligence Layer           m2m-engine
+        ↓
+Structured Intelligence
+        ↓
+Cognee + LLM                 lib/cognee, lib/llm
+        ↓
+Insights / Recommendations
+        ↓
+Merchant Decision
+        ↓
+n8n                          lib/n8n
+        ↓
+Action
+        ↓
+Outcome Measurement
+        ↓
+Cognee
+        ↓
+Future Intelligence
+```
+
+### Core hierarchy
+
+```
+Transaction
+    ↓
+Merchant
+    ↓
+Bazaar
+    ↓
+City
+```
+
+Intelligence flows **upward** through aggregation and comes back **down** as
+relevant network insights. Individual merchant data is never exposed to another
+merchant (see [Privacy](#privacy)).
+
+### Intelligence layer components
+
+Planned components of the M2M intelligence layer. None exist yet, and no files
+are stubbed for them.
+
+| # | Component | Responsibility |
+| --- | --- | --- |
+| 1 | Merchant Metrics | Per-merchant figures: GMV, transactions, AOV, growth |
+| 2 | Bazaar Aggregation | Roll merchants up into Bazaar-level figures |
+| 3 | City Aggregation | Roll Bazaars up into City-level figures |
+| 4 | Context Engine | Apply the active context (weather, day, time, event) as an input to calculation |
+| 5 | Cohort Engine | Find relevant comparable merchants, respecting `MIN_COHORT_SIZE` |
+| 6 | Pattern Detection | Detect patterns and changes in the data |
+| 7 | Cross-Level Comparison | Merchant vs cohort vs Bazaar vs City |
+| 8 | Evidence Engine | Attach the supporting evidence to each finding |
+| 9 | Relevance Engine | Decide which network intelligence matters to a given merchant |
+| 10 | Opportunity Engine | Turn relevant findings into growth opportunities |
+
+Context (`POST /api/context`) is an input to this layer, not a UI filter:
+changing it changes what is computed.
+
+## Roles: M2M engine, Cognee, LLM, n8n
+
+```
+M2M Engine  = calculates what is happening
+Cognee      = provides relevant historical context
+LLM         = explains and communicates the intelligence, generates recommendations
+n8n         = executes and orchestrates actions
+```
+
+### Cognee — memory / context layer
+
+Cognee remembers situations, insights, recommendations, actions and outcomes:
+
+```
+Situation → Insight → Action → Outcome → Cognee → Future relevant context
+```
+
+Cognee is **not** the core transaction analytics engine. M2M calculates current
+intelligence; Cognee provides historical context.
+
+### LLM — explanation layer
+
+The LLM explains already-calculated intelligence and phrases recommendations. It
+is not responsible for calculating core metrics or detecting the underlying
+statistical pattern.
+
+```
+LlmProvider
+  ├── OpenRouter            (implemented)
+  └── Sarvam                (future / optional — not available today)
+```
+
+### n8n — action / orchestration layer
+
+n8n is not only a notification mechanism. It executes and orchestrates actions:
+
+```
+Recommendation → Merchant Approval → n8n → Execute Action → Track Action
+      → Measure Outcome → Store Outcome → Cognee
+```
+
+Two valid paths lead into n8n:
+
+```
+Indirect:  Opportunity → Recommendation → Approval → n8n
+Direct:    Merchant → Action → n8n
+```
+
+The direct path is triggered from the merchant's private experience (right side
+of the Merchant Dialog) without a separate approval step.
+
+### Outcome / learning loop
+
+```
+Action
+  ↓
+Experiment
+  ↓
+Outcome Measurement
+  ↓
+Store Outcome
+  ↓
+Cognee
+  ↓
+Future Intelligence
+  ↓
+Better contextual recommendations
+```
+
+This is the continuous learning loop.
+
+## Shared vs private intelligence
+
+The Merchant Dialog is split in two, and the backend mirrors that split:
+
+| | Left side | Right side |
+| --- | --- | --- |
+| Kind | Shared / network / Bazaar intelligence | Private merchant intelligence + actions |
+| Audience | The shared Bazaar experience | Only that merchant, through Paytm |
+| Data | Aggregated / anonymized | The merchant's own data, plus network insights relevant to them |
+| Can act | No | Yes — recommendations, decisions, n8n workflows, experiments |
+
+See [api.md](api.md#endpoint-groups) for which endpoints belong to which side.
+
 ## Dependency rules
 
 - `m2m-engine/` imports nothing outside itself. No React, no Next.js, no
@@ -116,3 +271,6 @@ boundary with an OpenRouter provider.
 Not implemented: cohorting, aggregation, pattern detection, the database schema,
 any API route, the Bazaar city, simulation, Ask Bazaar, Cognee recall, and n8n
 actions. See [m2m-engine.md](m2m-engine.md) and [providers.md](providers.md).
+
+The endpoints in [api.md](api.md) are a **Planned API Contract**, agreed before
+implementation. None of them exist yet.

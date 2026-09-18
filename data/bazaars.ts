@@ -6,11 +6,10 @@
  * than to JSX. Nothing here is transaction data and nothing here is derived
  * from the M2M engine.
  *
- * `outline` is the boundary ring in coordinates normalised to the city plate
- * (0-1 on each axis), so it survives any viewport size or zoom level. The
- * values are generated from the plate itself — see
- * scripts/build-city-assets.py, which detects the painted rings and prints
- * this array.
+ * `outline` is the boundary in coordinates normalised to the city plate (0-1
+ * on each axis), so it survives any viewport size or zoom level. The
+ * boundaries themselves are painted into the plate; these are the hit areas
+ * over them, squared to the street grid.
  */
 
 export type BazaarId =

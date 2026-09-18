@@ -1,5 +1,5 @@
 """
-One-off preprocessing of the Paytm Bazaar reference render into web assets.
+Preprocessing of the landing screen render into web assets.
 
 The source render has the portal, the "Our Team" and "Our Idea" labels painted
 into the pixels. Those all become real HTML in the app, so they are inpainted
@@ -8,7 +8,7 @@ parallax the clouds away from the city during the Enter transition.
 
 Outputs (public/bazaar/): sky-plate.webp, clouds.webp
 
-    python3 scripts/build-bazaar-assets.py [path/to/render.png]
+    python3 scripts/build-landing-assets.py [path/to/render.png]
 """
 from pathlib import Path
 import sys

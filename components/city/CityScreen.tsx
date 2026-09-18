@@ -16,6 +16,9 @@ import styles from "./city.module.css";
 
 /** Mirrors the landing descent, played backwards. */
 const DEPARTURE_MS = 1500;
+/** Flying down into a Bazaar. */
+const DIVE_MS = 1500;
+const DIVE_SCALE = 3.2;
 const REDUCED_MS = 280;
 
 const MIN_SCALE = 1;
@@ -44,11 +47,18 @@ export default function CityScreen() {
   const [placement, setPlacement] = useState<ActionsPlacement | null>(null);
   const [analyzing, setAnalyzing] = useState<Bazaar | null>(null);
   const [leaving, setLeaving] = useState(false);
+  const [diving, setDiving] = useState(false);
   const exitTimer = useRef<number | undefined>(undefined);
 
   const activeEl = useRef<SVGGElement | null>(null);
   const hoverTimer = useRef<number | undefined>(undefined);
-  const drag = useRef<{ id: number; x: number; y: number; moved: number } | null>(null);
+  const drag = useRef<{
+    id: number;
+    x: number;
+    y: number;
+    moved: number;
+    captured: boolean;
+  } | null>(null);
 
   // The world is the plate scaled to cover the viewport; overlays share its box,
   // so region coordinates stay welded to the buildings under them.
@@ -180,10 +190,17 @@ export default function CityScreen() {
 
   const onPointerDown = (event: React.PointerEvent) => {
     if (event.button !== 0) return;
-    drag.current = { id: event.pointerId, x: event.clientX, y: event.clientY, moved: 0 };
+    // Capture is deferred until the pointer travels; capturing on press
+    // retargets the click away from anything inside the world.
+    drag.current = {
+      id: event.pointerId,
+      x: event.clientX,
+      y: event.clientY,
+      moved: 0,
+      captured: false,
+    };
     setDragging(true);
     setAnimating(false);
-    event.currentTarget.setPointerCapture(event.pointerId);
   };
 
   const onPointerMove = (event: React.PointerEvent) => {
@@ -195,6 +212,11 @@ export default function CityScreen() {
     state.moved += Math.abs(dx) + Math.abs(dy);
     state.x = event.clientX;
     state.y = event.clientY;
+
+    if (!state.captured && state.moved > DRAG_THRESHOLD) {
+      state.captured = true;
+      event.currentTarget.setPointerCapture(event.pointerId);
+    }
 
     setTransform((current) => clampTransform({ ...current, x: current.x + dx, y: current.y + dy }));
   };
@@ -213,9 +235,35 @@ export default function CityScreen() {
 
   const activeBazaar = bazaars.find((bazaar) => bazaar.id === activeId) ?? null;
 
+  /** Fly down toward the Bazaar, let the clouds close over, then land in it. */
   const zoomIntoBazaar = (bazaar: Bazaar) => {
+    if (diving || leaving) return;
     setActiveId(null);
-    router.push(`/bazaar/${bazaar.id}`);
+    setDiving(true);
+
+    const reduced = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+    if (!reduced) {
+      // Frame the Bazaar as the camera drops toward it.
+      const xs = bazaar.outline.map(([x]) => x);
+      const ys = bazaar.outline.map(([, y]) => y);
+      const nx = (Math.min(...xs) + Math.max(...xs)) / 2;
+      const ny = (Math.min(...ys) + Math.max(...ys)) / 2;
+
+      setAnimating(false);
+      setTransform(
+        clampTransform({
+          scale: DIVE_SCALE,
+          x: size.w / 2 - nx * worldW * DIVE_SCALE,
+          y: size.h / 2 - ny * worldH * DIVE_SCALE,
+        }),
+      );
+    }
+
+    exitTimer.current = window.setTimeout(
+      () => router.push(`/bazaar/${bazaar.id}`),
+      reduced ? REDUCED_MS : DIVE_MS,
+    );
   };
 
   const analyzeBazaar = (bazaar: Bazaar) => {
@@ -231,6 +279,7 @@ export default function CityScreen() {
       data-event={context.event}
       data-day={context.day}
       data-leaving={leaving || undefined}
+      data-diving={diving || undefined}
     >
       <div
         className={styles.viewport}

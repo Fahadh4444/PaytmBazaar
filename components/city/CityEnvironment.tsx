@@ -10,7 +10,7 @@ export const PLATE_H = 941;
 
 /* Bumped whenever the plate is regenerated. The filename never changes, so
    without this a browser keeps serving the copy it cached earlier. */
-const PLATE_VERSION = "5";
+const PLATE_VERSION = "6";
 const PLATE = `/bazaar/city-plate.webp?v=${PLATE_VERSION}`;
 
 const BIRD_FLIGHTS = [

@@ -1,0 +1,565 @@
+/*
+ * A Bazaar street.
+ *
+ * Same shape as the city screen: one plate with an interaction layer welded to
+ * it inside a transformable world, the chrome fixed outside it. The buildings
+ * are the merchants.
+ */
+
+.screen {
+  --ink: #0d1b3e;
+  --accent: #0b57d0;
+  --chrome: rgba(255, 255, 255, 0.88);
+  --chrome-line: rgba(255, 255, 255, 0.72);
+
+  position: fixed;
+  inset: 0;
+  overflow: hidden;
+  background: linear-gradient(#bcdcf6 0%, #dbecfa 42%, #cfe3f2 100%);
+  color: var(--ink);
+  font-family: var(--font-geist-sans), ui-sans-serif, system-ui, sans-serif;
+  /* Arrives out of the same bright cloud the landing descent ends in. */
+  animation: streetArrive 820ms ease-out both;
+}
+
+.viewport {
+  position: absolute;
+  inset: 0;
+  touch-action: none;
+  cursor: grab;
+}
+
+.viewport[data-dragging="true"] {
+  cursor: grabbing;
+}
+
+.world {
+  position: absolute;
+  top: 0;
+  left: 0;
+  transform-origin: 0 0;
+  will-change: transform;
+}
+
+.world[data-animate="true"] {
+  transition: transform 160ms ease-out;
+}
+
+/* Sits behind the plate so a missing asset degrades to sky and ground rather
+   than to a broken image. */
+.world::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background:
+    linear-gradient(#a8cdec 0%, #cfe4f5 28%, #b9d2b0 46%, #9dbf96 72%, #8fae8a 100%);
+}
+
+.plate {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: fill;
+  user-select: none;
+  -webkit-user-drag: none;
+}
+
+/* Contextual tint. Time and weather only shade the city for now; no
+   simulation runs behind it. */
+.tint {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  transition: background 900ms ease, opacity 900ms ease;
+  mix-blend-mode: multiply;
+  opacity: 0;
+}
+
+.screen[data-phase="dawn"] .tint {
+  opacity: 0.5;
+  background: linear-gradient(160deg, #ffd9a8, #ffb98a 55%, #b9c9e8);
+}
+
+.screen[data-phase="dusk"] .tint {
+  opacity: 0.62;
+  background: linear-gradient(160deg, #ffc38a, #ff9d6b 45%, #7e86c4);
+}
+
+.screen[data-phase="night"] .tint {
+  opacity: 0.74;
+  background: linear-gradient(160deg, #46538f, #27305c 58%, #161c3c);
+}
+
+.screen[data-weather="Rain"] .tint {
+  opacity: 0.55;
+  background: linear-gradient(160deg, #9fb2c9, #7f93b0 60%, #63788f);
+}
+
+.screen[data-weather="Cold"] .tint {
+  opacity: 0.4;
+  background: linear-gradient(160deg, #cfe2f2, #a9c7e4 60%, #93b4d8);
+}
+
+.screen[data-weather="Hot"] .tint {
+  opacity: 0.4;
+  background: linear-gradient(160deg, #ffe0ad, #ffca86 60%, #ffb877);
+}
+
+/* --------------------------------------------------------------- chrome */
+
+.exit,
+.brand,
+.controls,
+.mapControls {
+  position: absolute;
+  z-index: 5;
+}
+
+.exit {
+  top: clamp(14px, 2.2vh, 26px);
+  left: clamp(14px, 1.6vw, 30px);
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 20px 10px 12px;
+  border: 1px solid var(--chrome-line);
+  border-radius: 999px;
+  background: var(--chrome);
+  backdrop-filter: blur(12px) saturate(130%);
+  -webkit-backdrop-filter: blur(12px) saturate(130%);
+  box-shadow: 0 8px 24px -10px rgba(16, 42, 92, 0.42);
+  color: var(--ink);
+  font-size: clamp(13px, 1.05vw, 15px);
+  font-weight: 550;
+  text-decoration: none;
+  cursor: pointer;
+  transition: transform 200ms ease, box-shadow 200ms ease;
+}
+
+.exit:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 12px 28px -10px rgba(16, 42, 92, 0.5);
+}
+
+.exit:focus-visible {
+  outline: 3px solid var(--accent);
+  outline-offset: 3px;
+}
+
+.exitArrow {
+  display: grid;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  background: var(--accent);
+  color: #fff;
+}
+
+.brand {
+  top: clamp(10px, 1.6vh, 18px);
+  left: 50%;
+  transform: translateX(-50%);
+  text-align: center;
+  pointer-events: none;
+}
+
+.brandName {
+  margin: 0;
+  font-size: clamp(19px, 2vw, 27px);
+  font-weight: 700;
+  letter-spacing: -0.015em;
+  color: #0a2f7a;
+  text-shadow: 0 1px 10px rgba(255, 255, 255, 0.85);
+}
+
+.brandName em {
+  font-style: normal;
+  color: #00b9f1;
+}
+
+.brandTag {
+  margin: 2px 0 0;
+  font-size: clamp(11px, 0.92vw, 13.5px);
+  font-style: italic;
+  color: rgba(13, 43, 100, 0.72);
+  text-shadow: 0 1px 8px rgba(255, 255, 255, 0.9);
+}
+
+.brandRule {
+  width: 62px;
+  height: 2px;
+  margin: 7px auto 0;
+  border-radius: 2px;
+  background: linear-gradient(90deg, rgba(0, 185, 241, 0), #00b9f1, rgba(0, 185, 241, 0));
+}
+
+.controls {
+  top: clamp(14px, 2.2vh, 26px);
+  right: clamp(14px, 1.6vw, 30px);
+  display: flex;
+  gap: clamp(6px, 0.7vw, 12px);
+}
+
+.control {
+  position: relative;
+}
+
+.controlButton {
+  display: inline-flex;
+  align-items: center;
+  gap: 9px;
+  padding: 8px 10px 8px 9px;
+  border: 1px solid var(--chrome-line);
+  border-radius: 14px;
+  background: var(--chrome);
+  backdrop-filter: blur(12px) saturate(130%);
+  -webkit-backdrop-filter: blur(12px) saturate(130%);
+  box-shadow: 0 8px 24px -10px rgba(16, 42, 92, 0.42);
+  color: var(--ink);
+  cursor: pointer;
+  transition: transform 180ms ease, box-shadow 180ms ease;
+}
+
+.controlButton:hover {
+  transform: translateY(-1px);
+}
+
+.controlButton:focus-visible {
+  outline: 3px solid var(--accent);
+  outline-offset: 3px;
+}
+
+.controlIcon {
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  flex: none;
+}
+
+.controlText {
+  display: grid;
+  gap: 1px;
+  text-align: left;
+  line-height: 1.15;
+}
+
+.controlLabel {
+  font-size: clamp(10px, 0.78vw, 11.5px);
+  color: rgba(13, 27, 62, 0.6);
+}
+
+.controlValue {
+  font-size: clamp(12px, 0.95vw, 14px);
+  font-weight: 650;
+}
+
+.controlChevron {
+  flex: none;
+  color: rgba(13, 27, 62, 0.45);
+  transition: transform 200ms ease;
+}
+
+.controlButton[aria-expanded="true"] .controlChevron {
+  transform: rotate(180deg);
+}
+
+.menu {
+  position: absolute;
+  top: calc(100% + 8px);
+  right: 0;
+  z-index: 6;
+  min-width: 100%;
+  max-height: 260px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  margin: 0;
+  padding: 6px;
+  list-style: none;
+  border: 1px solid rgba(255, 255, 255, 0.7);
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.94);
+  backdrop-filter: blur(16px) saturate(130%);
+  -webkit-backdrop-filter: blur(16px) saturate(130%);
+  box-shadow: 0 18px 44px -16px rgba(16, 42, 92, 0.55);
+  animation: menuIn 160ms ease-out both;
+}
+
+.option {
+  padding: 8px 12px;
+  border-radius: 9px;
+  font-size: clamp(12px, 0.95vw, 14px);
+  color: var(--ink);
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.option:hover,
+.option[data-focused="true"] {
+  background: rgba(11, 87, 208, 0.1);
+}
+
+.option[aria-selected="true"] {
+  background: var(--accent);
+  color: #fff;
+  font-weight: 600;
+}
+
+/* --------------------------------------------------------- map controls */
+
+.mapControls {
+  right: clamp(14px, 1.6vw, 30px);
+  bottom: clamp(16px, 3vh, 34px);
+  display: grid;
+  gap: 12px;
+  justify-items: center;
+}
+
+.zoomGroup {
+  display: grid;
+  border: 1px solid var(--chrome-line);
+  border-radius: 14px;
+  background: var(--chrome);
+  backdrop-filter: blur(12px) saturate(130%);
+  -webkit-backdrop-filter: blur(12px) saturate(130%);
+  box-shadow: 0 8px 24px -10px rgba(16, 42, 92, 0.42);
+  overflow: hidden;
+}
+
+.zoomButton {
+  display: grid;
+  place-items: center;
+  width: 42px;
+  height: 40px;
+  border: 0;
+  background: transparent;
+  color: var(--ink);
+  cursor: pointer;
+  transition: background 160ms ease;
+}
+
+.zoomButton + .zoomButton {
+  border-top: 1px solid rgba(13, 27, 62, 0.12);
+}
+
+.zoomButton:hover:not(:disabled) {
+  background: rgba(11, 87, 208, 0.1);
+}
+
+.zoomButton:disabled {
+  opacity: 0.38;
+  cursor: default;
+}
+
+.zoomButton:focus-visible {
+  outline: 3px solid var(--accent);
+  outline-offset: -3px;
+}
+
+.compass {
+  display: grid;
+  place-items: center;
+  width: 46px;
+  height: 46px;
+  border: 1px solid var(--chrome-line);
+  border-radius: 50%;
+  background: var(--chrome);
+  backdrop-filter: blur(12px) saturate(130%);
+  -webkit-backdrop-filter: blur(12px) saturate(130%);
+  box-shadow: 0 8px 24px -10px rgba(16, 42, 92, 0.42);
+  color: var(--accent);
+}
+
+/* ------------------------------------------------------- leaving the city */
+
+/* The reverse of the landing descent: the cloud deck closes over the city and
+   the frame washes out.
+
+   The world is sized to *cover* the viewport, so scaling it below 1 pulls its
+   own edges into frame and the whole thing reads as a shrinking photograph.
+   It only ever scales up here; the sense of rising comes from the cloud deck
+   closing in and rushing past, not from shrinking the city. */
+.screen[data-leaving="true"] .viewport {
+  transform: scale(1.06);
+  transition: transform 1450ms cubic-bezier(0.32, 0, 0.5, 1);
+}
+
+.screen[data-leaving="true"] .exit,
+.screen[data-leaving="true"] .brand,
+.screen[data-leaving="true"] .controls,
+.screen[data-leaving="true"] .mapControls {
+  opacity: 0;
+  transition: opacity 420ms ease;
+  pointer-events: none;
+}
+
+.departure {
+  position: fixed;
+  inset: 0;
+  z-index: 8;
+  overflow: hidden;
+  pointer-events: none;
+}
+
+.departCloud {
+  position: absolute;
+  inset: -12%;
+  background-image: url("/bazaar/clouds.webp");
+  background-repeat: no-repeat;
+  background-size: cover;
+  transition: transform 1150ms cubic-bezier(0.3, 0, 0.45, 1);
+}
+
+.departLeft {
+  transform: translateX(-128%) scale(1.2);
+  -webkit-mask-image: linear-gradient(to right, #000 0%, #000 64%, transparent 100%);
+  mask-image: linear-gradient(to right, #000 0%, #000 64%, transparent 100%);
+}
+
+.departRight {
+  transform: translateX(128%) scale(1.2);
+  -webkit-mask-image: linear-gradient(to left, #000 0%, #000 64%, transparent 100%);
+  mask-image: linear-gradient(to left, #000 0%, #000 64%, transparent 100%);
+}
+
+.screen[data-leaving="true"] .departLeft {
+  transform: translateX(3%) scale(1.5);
+}
+
+.screen[data-leaving="true"] .departRight {
+  transform: translateX(-3%) scale(1.5);
+}
+
+.departWash {
+  position: absolute;
+  inset: 0;
+  opacity: 0;
+  background: radial-gradient(
+    circle closest-side at 50% 48%,
+    rgba(255, 255, 255, 0.99) 0%,
+    rgba(246, 251, 255, 0.98) 52%,
+    rgba(230, 243, 254, 0.94) 78%,
+    rgba(206, 230, 250, 0) 100%
+  );
+  transform: scale(0.5);
+  transition: opacity 720ms ease-in 480ms, transform 1300ms cubic-bezier(0.32, 0, 0.5, 1);
+}
+
+.screen[data-leaving="true"] .departWash {
+  opacity: 1;
+  transform: scale(2.9);
+}
+
+/* ------------------------------------------------------------- merchants */
+
+.merchants {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+}
+
+.merchant {
+  cursor: pointer;
+  outline: none;
+}
+
+/* A circle of light out of the middle of the building. No outline: a stroked
+   polygon over a storefront reads as a box drawn on the render. */
+.merchantGlow {
+  fill: url(#merchantGlow);
+  opacity: 0;
+  pointer-events: none;
+  transform-box: fill-box;
+  transform-origin: center;
+  transform: scale(0.66);
+  transition: opacity 260ms ease, transform 340ms cubic-bezier(0.22, 0.8, 0.28, 1);
+}
+
+/* Transparent, but still takes the pointer. */
+.merchantHit {
+  fill: #ffffff;
+  fill-opacity: 0;
+  pointer-events: all;
+}
+
+.merchant:hover .merchantGlow,
+.merchant:focus-visible .merchantGlow {
+  opacity: 1;
+  transform: scale(1);
+}
+
+/* ------------------------------------------------ merchant dialog body */
+
+.dialogRule {
+  height: 3px;
+  margin: 18px 0;
+  border: 0;
+  background: var(--ink);
+}
+
+.dialogLede {
+  margin: 0;
+  font-family: var(--font-geist-mono), ui-monospace, monospace;
+  font-size: clamp(11px, 1vw, 12.5px);
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: rgba(13, 27, 62, 0.6);
+}
+
+.dialogEmpty {
+  display: grid;
+  place-items: center;
+  margin: 18px 0 0;
+  padding: 72px 16px;
+  border: 2px dashed rgba(13, 27, 62, 0.3);
+  font-family: var(--font-geist-mono), ui-monospace, monospace;
+  font-size: clamp(11.5px, 1vw, 13px);
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: rgba(13, 27, 62, 0.5);
+}
+
+/* ------------------------------------------------------------ keyframes */
+
+@keyframes streetArrive {
+  from {
+    opacity: 0;
+    filter: brightness(1.5);
+  }
+  to {
+    opacity: 1;
+    filter: none;
+  }
+}
+
+@keyframes menuIn {
+  from {
+    opacity: 0;
+    transform: translateY(-5px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .screen,
+  .menu {
+    animation: none !important;
+  }
+
+  .world[data-animate="true"] {
+    transition-duration: 1ms;
+  }
+
+  .screen[data-leaving="true"] .viewport,
+  .departCloud,
+  .departWash {
+    transition-duration: 180ms !important;
+    transition-delay: 0ms !important;
+  }
+}

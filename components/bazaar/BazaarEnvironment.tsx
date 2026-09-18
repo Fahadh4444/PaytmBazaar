@@ -8,7 +8,7 @@ const CLOUDS = "/bazaar/clouds.webp";
 /**
  * The world under the clouds.
  *
- * Four image layers cut from one render (see scripts/build-bazaar-assets.py):
+ * Four image layers cut from one render (see scripts/build-landing-assets.py):
  * the city plate, a cloud deck split left/right so it can part, and a near
  * deck that frames the edges. Both files are pre-compressed WebP, so they are
  * served as-is rather than re-encoded.

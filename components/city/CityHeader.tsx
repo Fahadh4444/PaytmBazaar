@@ -11,6 +11,9 @@ type CityHeaderProps = {
   context: CityContext;
   onContextChange: (next: CityContext) => void;
   onExit: () => void;
+  /** The Bazaar street reuses this header with its own back control. */
+  backLabel?: string;
+  backHref?: string;
 };
 
 const toOptions = (values: readonly string[]): ControlOption[] =>
@@ -25,7 +28,13 @@ const DAY_OPTIONS = toOptions(DAYS);
 const WEATHER_OPTIONS = toOptions(WEATHERS);
 const EVENT_OPTIONS = toOptions(EVENTS);
 
-export default function CityHeader({ context, onContextChange, onExit }: CityHeaderProps) {
+export default function CityHeader({
+  context,
+  onContextChange,
+  onExit,
+  backLabel = "Exit Paytm Bazaar",
+  backHref = "/",
+}: CityHeaderProps) {
   // Only one menu open at a time.
   const [openControl, setOpenControl] = useState<string | null>(null);
   const opener = (id: string) => (open: boolean) => setOpenControl(open ? id : null);
@@ -36,7 +45,7 @@ export default function CityHeader({ context, onContextChange, onExit }: CityHea
           plain click plays the climb out first. */}
       <Link
         className={styles.exit}
-        href="/"
+        href={backHref}
         onClick={(event) => {
           if (event.metaKey || event.ctrlKey || event.shiftKey || event.button !== 0) return;
           event.preventDefault();
@@ -58,7 +67,7 @@ export default function CityHeader({ context, onContextChange, onExit }: CityHea
             <path d="m11 6-6 6 6 6" />
           </svg>
         </span>
-        Exit Paytm Bazaar
+        {backLabel}
       </Link>
 
       <div className={styles.brand}>

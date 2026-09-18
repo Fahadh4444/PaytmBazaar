@@ -8,13 +8,13 @@ Application-side database access lives in [`lib/supabase/`](../lib/supabase) —
 that is *how the app talks to the database*, which is a separate concern from
 *what the database is*.
 
-## No migrations yet
+## Current schema
 
-There are none, deliberately. No feature reads or writes the database yet, and
-we do not want a speculative schema of `merchants` / `transactions` / `insights`
-/ `actions` tables written before the first slice shows what those rows actually
-need to hold. Today merchant data comes from synthetic files behind
-[`lib/paytm/`](../lib/paytm).
+`bazaars`, `merchants`, `payment_events` and the `merchant_daily_metrics` view
+hold synthetic Paytm-like prototype data. The application reads them only
+through the Data Adapter in [`lib/paytm/`](../lib/paytm) — see
+[docs/data-adapter.md](../docs/data-adapter.md). If you rename a table or
+column, `lib/paytm/adapter/supabase.ts` is the one file to update.
 
 ## Adding one
 

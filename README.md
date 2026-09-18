@@ -24,12 +24,12 @@ This:
 This is a foundation, not the product. What exists today:
 
 - a runnable Next.js + TypeScript application with a minimal landing page
-- the core domain vocabulary and the M2M engine boundary
-- synthetic demo merchants behind a data-source boundary
+- the M2M engine: merchant, cohort, Bazaar and City metrics, context, patterns, evidence, Bazaar Impact and opportunities
+- a database schema of synthetic Paytm-like data, read through the Data Adapter (`lib/paytm`)
 - Supabase clients, and an LLM boundary with an OpenRouter provider
 
 What does not exist yet: the Bazaar city, merchant dashboards, simulation,
-cohorting and pattern detection, API routes, database schema, Ask Bazaar,
+API routes, Ask Bazaar,
 Cognee recall, and n8n actions. These arrive as vertical slices.
 
 The prototype uses **synthetic data**. There is no authorized access to real
@@ -51,7 +51,7 @@ http://localhost:3000. No credentials are needed to start.
 app/          Next.js application
 m2m-engine/   Deterministic merchant-to-merchant intelligence (no dependencies)
 data/         Synthetic demo data
-lib/paytm/    Merchant data-source boundary
+lib/paytm/    Data Adapter — the only reader of merchant data
 lib/supabase/ Application-side database access
 lib/llm/      LLM provider boundary (OpenRouter today, Sarvam possible later)
 lib/cognee/   Contextual memory boundary
@@ -79,14 +79,16 @@ The M2M engine computes the numbers. The LLM only explains them.
 one merchant  →  one change  →  network calculation  →  one pattern  →  one insight
 ```
 
-Real deterministic logic over the synthetic data — not a button that prints a
-fixed sentence. This matters more than the visual city.
+The engine half of this exists: `analyzeMerchant()` computes the network
+comparison, patterns and opportunities from the synthetic data. Next is exposing
+it through an API route and showing it in the Merchant Dialog.
 
 ## Documentation
 
 - [Architecture](docs/architecture.md) — boundaries, data flow, intelligence layer, privacy
 - [End-to-end flow](docs/flow.md) — Landing → City → Bazaar → Merchant Dialog → action → learning (planned)
 - [Planned API contract](docs/api.md) — proposed endpoints, not yet implemented
-- [M2M engine principles](docs/m2m-engine.md) — what the engine may and may not do
+- [Data Adapter](docs/data-adapter.md) — how merchant data is read; the M2M engine's only data dependency (implemented)
+- [M2M engine](docs/m2m-engine.md) — pipeline, metrics, cohorts, patterns, output contract (implemented)
 - [Provider strategy](docs/providers.md) — external integrations and failure handling
 - [Local development](docs/development.md) — setup, scripts, branching, parallel work

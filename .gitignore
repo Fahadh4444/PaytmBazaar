@@ -40,3 +40,6 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# local database backups (scripts/rebuild_m2m_demo_data.py)
+/data/backups/

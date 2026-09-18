@@ -14,6 +14,8 @@ type SceneDialogProps = {
   title: string;
   /** Roomier panel, for content that needs side-by-side space. */
   wide?: boolean;
+  /** Full dashboard width for analysis and conversational workspaces. */
+  workspace?: boolean;
   children: ReactNode;
 };
 
@@ -30,6 +32,7 @@ export default function SceneDialog({
   eyebrow,
   title,
   wide = false,
+  workspace = false,
   children,
 }: SceneDialogProps) {
   const ref = useRef<HTMLDialogElement>(null);
@@ -79,7 +82,12 @@ export default function SceneDialog({
     <dialog
       ref={ref}
       aria-labelledby={titleId}
-      className={[styles.dialog, wide && styles.wide, closing && styles.closing]
+      className={[
+        styles.dialog,
+        wide && styles.wide,
+        workspace && styles.workspace,
+        closing && styles.closing,
+      ]
         .filter(Boolean)
         .join(" ")}
       // A click that lands on the dialog itself came from the backdrop.

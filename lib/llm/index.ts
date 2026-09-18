@@ -7,6 +7,8 @@
  * LlmProvider and register it in the map below — nothing else should change.
  */
 
+import "server-only";
+
 import { openRouterProvider } from "./openrouter";
 import { LlmError, type LlmProvider } from "./types";
 
@@ -36,4 +38,14 @@ export function getLlmProvider(): LlmProvider {
 export function isLlmConfigured(): boolean {
   const name = process.env.LLM_PROVIDER ?? DEFAULT_PROVIDER;
   return providers[name]?.isConfigured() ?? false;
+}
+
+/** Safe configuration metadata for diagnostics; never exposes provider secrets. */
+export function getLlmStatus() {
+  const provider = getLlmProvider();
+  return {
+    provider: provider.name,
+    configured: provider.isConfigured(),
+    model: process.env.OPENROUTER_MODEL ?? "deepseek/deepseek-v4-flash",
+  };
 }

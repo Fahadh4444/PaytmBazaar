@@ -121,7 +121,9 @@ export default function BazaarScreen({ bazaar }: { bazaar: Bazaar }) {
       </div>
 
       <MerchantDialog
+        key={openShop?.id ?? "closed"}
         shop={openShop}
+        bazaarId={bazaar.id}
         bazaarName={`${bazaar.name} Bazaar`}
         open={openShop !== null}
         onClose={() => setOpenShop(null)}

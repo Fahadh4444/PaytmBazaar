@@ -6,10 +6,13 @@
  * SDK, nothing invented.
  */
 
+import "server-only";
+
 import { LlmError, type LlmProvider, type LlmRequest, type LlmResponse } from "./types";
 
 const OPENROUTER_CHAT_COMPLETIONS_URL = "https://openrouter.ai/api/v1/chat/completions";
-const DEFAULT_MODEL = "openai/gpt-4o-mini";
+const DEFAULT_MODEL = "deepseek/deepseek-v4-flash";
+const REQUEST_TIMEOUT_MS = 30_000;
 
 interface OpenRouterChoice {
   message?: { content?: string };
@@ -40,12 +43,19 @@ export const openRouterProvider: LlmProvider = {
         headers: {
           Authorization: `Bearer ${apiKey}`,
           "Content-Type": "application/json",
+          ...(process.env.NEXT_PUBLIC_APP_URL
+            ? { "HTTP-Referer": process.env.NEXT_PUBLIC_APP_URL }
+            : {}),
+          "X-Title": "Paytm Bazaar",
         },
         body: JSON.stringify({
           model: request.model ?? process.env.OPENROUTER_MODEL ?? DEFAULT_MODEL,
           messages: request.messages,
           temperature: request.temperature,
+          max_tokens: request.maxTokens,
         }),
+        cache: "no-store",
+        signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
       });
     } catch (cause) {
       throw new LlmError("Could not reach OpenRouter.", "openrouter", { cause });

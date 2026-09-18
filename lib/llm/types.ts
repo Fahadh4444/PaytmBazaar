@@ -21,6 +21,7 @@ export interface LlmRequest {
   /** Provider-agnostic hint; each provider maps it to a concrete model. */
   model?: string;
   temperature?: number;
+  maxTokens?: number;
 }
 
 export interface LlmResponse {

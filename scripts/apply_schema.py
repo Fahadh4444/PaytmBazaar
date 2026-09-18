@@ -26,6 +26,7 @@ def load_local_env() -> None:
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("migration", nargs="?", type=Path, default=DEFAULT_MIGRATION)
+    parser.add_argument("--verify-only", action="store_true", help="Check the database without applying SQL")
     args = parser.parse_args()
 
     load_local_env()
@@ -46,11 +47,11 @@ def main() -> None:
             (parsed.scheme, f"postgres:{password}@{parsed.hostname}{port}", parsed.path, parsed.query, parsed.fragment)
         )
 
-    migration = args.migration if args.migration.is_absolute() else ROOT / args.migration
-    sql = migration.read_text(encoding="utf-8")
     with psycopg.connect(database_url, connect_timeout=15) as connection:
         with connection.cursor() as cursor:
-            cursor.execute(sql)
+            if not args.verify_only:
+                migration = args.migration if args.migration.is_absolute() else ROOT / args.migration
+                cursor.execute(migration.read_text(encoding="utf-8"))
 
             cursor.execute(
                 """

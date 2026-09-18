@@ -31,6 +31,15 @@
   width: min(660px, calc(100vw - 30px));
 }
 
+.dialog.workspace {
+  width: min(1600px, calc(100vw - 32px));
+}
+
+.dialog.workspace .panel {
+  height: calc(100dvh - 28px);
+  max-height: none;
+}
+
 /* Flat tint, not a soft vignette: the scene is pushed back, not dissolved. */
 .dialog::backdrop {
   background: rgba(9, 28, 72, 0.56);

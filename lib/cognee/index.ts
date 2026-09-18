@@ -1,19 +1,54 @@
-/**
- * Cognee boundary — contextual memory and knowledge retrieval.
- *
- * Cognee answers "what relevant context do we remember?": past situations,
- * insights, recommendations, actions and their outcomes. It is not the
- * database, not the M2M engine, and not an LLM provider. Raw transactions stay
- * in Postgres; deterministic analytics stay in the engine.
- *
- * No client is implemented yet, on purpose. We have credits but have not yet
- * confirmed the API surface against real credentials, and inventing method
- * names would be worse than an honest gap. The first feature that genuinely
- * needs recall implements this file against the real SDK.
- *
- * Cognee is optional: every caller must work when this returns false.
- */
+/** Server-only Cognee Cloud integration boundary. */
+
+import "server-only";
+
+const DEFAULT_BASE_URL = "https://api.cognee.ai";
+const REQUEST_TIMEOUT_MS = 15_000;
+
+export type CogneeConnectionStatus = {
+  service: "cognee";
+  configured: boolean;
+  reachable: boolean;
+  status: number | null;
+};
+
+export class CogneeError extends Error {
+  constructor(message: string, options?: { cause?: unknown }) {
+    super(message, options);
+    this.name = "CogneeError";
+  }
+}
 
 export function isCogneeConfigured(): boolean {
-  return Boolean(process.env.COGNEE_API_KEY);
+  return Boolean(process.env.COGNEE_API_KEY && process.env.COGNEE_TENANT_ID);
+}
+
+export async function checkCogneeConnection(): Promise<CogneeConnectionStatus> {
+  const apiKey = process.env.COGNEE_API_KEY;
+  const tenantId = process.env.COGNEE_TENANT_ID;
+  if (!apiKey || !tenantId) {
+    return { service: "cognee", configured: false, reachable: false, status: null };
+  }
+
+  const baseUrl = (process.env.COGNEE_BASE_URL ?? DEFAULT_BASE_URL).replace(/\/$/, "");
+  let response: Response;
+  try {
+    response = await fetch(`${baseUrl}/health`, {
+      headers: {
+        "X-Api-Key": apiKey,
+        "X-Tenant-Id": tenantId,
+        Accept: "application/json",
+      },
+      cache: "no-store",
+      signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
+    });
+  } catch (cause) {
+    throw new CogneeError("Could not reach Cognee.", { cause });
+  }
+
+  if (!response.ok) {
+    throw new CogneeError(`Cognee returned ${response.status} ${response.statusText}.`);
+  }
+
+  return { service: "cognee", configured: true, reachable: true, status: response.status };
 }

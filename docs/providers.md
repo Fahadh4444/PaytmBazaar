@@ -11,12 +11,12 @@ on the boundary. Provider details do not leak past it.
 
 | Provider | Role | Status |
 | --- | --- | --- |
-| Supabase | PostgreSQL, structured facts | Clients implemented; no schema yet |
+| Supabase | PostgreSQL, structured facts | Schema + clients implemented; read through the [Data Adapter](data-adapter.md) |
 | OpenRouter | LLM provider | Implemented |
 | Sarvam | Possible future LLM / voice / multilingual | **Not integrated** — no confirmed access |
 | Cognee | Contextual memory | Boundary only — not implemented |
 | n8n | Action orchestration | Boundary only — not implemented |
-| Paytm | Intended data source | **No authorized access** — synthetic data only |
+| Paytm | Intended data source | **No authorized access** — synthetic data in Supabase behind `PaytmDataSource` |
 
 Nothing in this repository calls a Paytm API, and none of the demo data is real
 Paytm merchant data. Do not describe the prototype as connected to Paytm
@@ -61,6 +61,18 @@ Action orchestration, after intelligence and after merchant approval:
 insight  →  recommendation  →  merchant approves  →  n8n  →  action  →  outcome
 ```
 
+n8n is the action / orchestration layer, not only a notification mechanism.
+It can also be triggered directly from the merchant's private experience:
+
+```
+Indirect:  opportunity  →  recommendation  →  approval  →  n8n
+Direct:    merchant  →  action  →  n8n
+```
+
+After execution, the outcome is measured and stored in Cognee as future
+context. See [architecture.md](architecture.md#n8n--action--orchestration-layer)
+and the planned `/api/merchant/{id}/workflows` endpoints in [api.md](api.md).
+
 The M2M algorithm does not move into n8n. Workflows execute business actions;
 the application owns the intelligence.
 
@@ -80,6 +92,8 @@ Optional dependencies must not become hard dependencies.
   shown. Only action execution fails, and it reports that it failed.
 - **Supabase unconfigured** → clients throw a descriptive error at the call
   site, not at import time, so pages that do not touch the database still render.
+  Through `lib/paytm` this surfaces as a `DataSourceError`, like any other
+  database failure — callers never see a raw Supabase error.
 
 Configuration is read lazily everywhere for this reason: a missing key breaks
 the feature that needs it, not application startup.

@@ -26,8 +26,10 @@ startup — nothing below the landing page needs credentials yet.
 | `npm start` | Serve the production build |
 | `npm run lint` | ESLint |
 | `npm run typecheck` | `tsc --noEmit` |
+| `npm test` | Unit tests (`node:test` via `tsx`, files in `**/__tests__/*.test.ts`) |
 
-Run `npm run typecheck` and `npm run lint` before pushing.
+Run `npm run typecheck`, `npm run lint` and `npm test` before pushing. Tests
+need no network or credentials.
 
 ## Environment variables
 
@@ -103,7 +105,9 @@ Each is a real slot, none is wired up:
 - **n8n** — a workflow trigger in `lib/n8n/`, called after merchant approval.
   If we later version-control exported workflow JSON, a root `n8n/workflows/`
   directory can be added then.
-- **Database** — first migration in `supabase/migrations/`, queries in
-  `lib/supabase/`.
-- **Real Paytm data** — a new implementation behind `lib/paytm/`, only with
-  authorized access. Nothing above that boundary should need to change.
+- **New merchant data tables** — a migration in `supabase/migrations/`, then
+  a domain type and methods on `PaytmDataSource` implemented in
+  `lib/paytm/adapter/supabase.ts`. See [data-adapter.md](data-adapter.md).
+- **Real Paytm data** — a new `PaytmDataSource` implementation behind
+  `lib/paytm/`, only with authorized access. Nothing above that boundary should
+  need to change.

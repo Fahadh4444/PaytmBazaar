@@ -12,7 +12,7 @@ of the product is not built yet.
 
 | Layer | Question it answers |
 | --- | --- |
-| `lib/paytm/` | Where does merchant data come from? |
+| `lib/paytm/` | Where does merchant data come from? (the Data Adapter) |
 | `lib/supabase/` | What structured facts do we have? |
 | `m2m-engine/` | What is true right now? |
 | `lib/cognee/` | What relevant context do we remember? |
@@ -28,9 +28,9 @@ layer answer another layer's question, it is the wrong change.
 app/              Next.js application (App Router) and API routes
 components/       Shared UI components (created when the first one exists)
 m2m-engine/       Deterministic merchant-to-merchant intelligence — core product
-data/             Synthetic demo data
+data/             Synthetic UI demo data (city/bazaar screens)
 lib/
-  paytm/          Merchant data-source boundary
+  paytm/          Data Adapter — the only reader of merchant data (see data-adapter.md)
   supabase/       Application-side database access
   llm/            LLM provider boundary (OpenRouter today)
   cognee/         Contextual memory boundary
@@ -59,7 +59,7 @@ boundary because it is the thing we are actually building.
 ## Data flow
 
 ```
-data source  →  lib/paytm  →  structured data  →  m2m-engine
+Supabase  →  lib/paytm (Data Adapter)  →  domain types  →  m2m-engine
                                                        ↓
                                               deterministic insight
                                                        ↓
@@ -80,11 +80,173 @@ A request uses only the layers it needs. A numeric comparison does not call an
 LLM. A database read does not call Cognee. A recommendation with no external
 effect does not call n8n.
 
+## Backend intelligence flow (agreed design)
+
+> **Status: planned, not implemented.** This is the finalized target flow. The
+> user-facing journey is in [flow.md](flow.md); the endpoint contract is in
+> [api.md](api.md) (Planned API Contract).
+
+```
+Synthetic Paytm-like Data
+        ↓
+Data Adapter                 lib/paytm        ← implemented
+        ↓
+Data Normalization
+        ↓
+Intelligence Layer           m2m-engine       ← implemented
+        ↓
+Structured Intelligence
+        ↓
+Cognee + LLM                 lib/cognee, lib/llm
+        ↓
+Insights / Recommendations
+        ↓
+Merchant Decision
+        ↓
+n8n                          lib/n8n
+        ↓
+Action
+        ↓
+Outcome Measurement
+        ↓
+Cognee
+        ↓
+Future Intelligence
+```
+
+### Core hierarchy
+
+```
+Transaction
+    ↓
+Merchant
+    ↓
+Bazaar
+    ↓
+City
+```
+
+Intelligence flows **upward** through aggregation and comes back **down** as
+relevant network insights. Individual merchant data is never exposed to another
+merchant (see [Privacy](#privacy)).
+
+### Intelligence layer components
+
+> **Status: implemented** (except the Relevance Engine). Details in
+> [m2m-engine.md](m2m-engine.md).
+
+| # | Component | Responsibility | Where |
+| --- | --- | --- | --- |
+| 1 | Merchant Metrics | GMV, transactions, AOV, growth, refunds over two periods | `metrics.ts` |
+| 2 | Bazaar Aggregation | The same five figures for the merchant's Bazaar | `groups.ts` |
+| 3 | City Aggregation | The same five figures for every Bazaar in the city | `groups.ts` |
+| 4 | Context Engine | Sales by time of day, weekday, weather, event (associations only) | `context.ts` |
+| 5 | Cohort Engine | Same Bazaar + category, falling back to city + category; `MIN_COHORT_SIZE` | `cohort.ts` |
+| 6 | Pattern Detection | Deterministic rules over comparisons and context | `patterns.ts` |
+| 7 | Cross-Level Comparison | Merchant vs cohort vs Bazaar vs City | `comparison.ts` |
+| 8 | Evidence Engine | The figures behind every finding | `evidence.ts` |
+| 9 | Relevance Engine | Decide which network intelligence matters to a merchant | not yet built |
+| 10 | Opportunity Engine | Structured opportunities, including **Bazaar Impact** | `impact.ts`, `opportunities.ts` |
+
+`analyzeMerchant()` runs the whole pipeline and returns one `M2MIntelligence`
+object, the contract for the future API, UI and LLM layers.
+
+Context (`POST /api/context`) is an input to this layer, not a UI filter:
+changing it changes what is computed.
+
+## Roles: M2M engine, Cognee, LLM, n8n
+
+```
+M2M Engine  = calculates what is happening
+Cognee      = provides relevant historical context
+LLM         = explains and communicates the intelligence, generates recommendations
+n8n         = executes and orchestrates actions
+```
+
+### Cognee — memory / context layer
+
+Cognee remembers situations, insights, recommendations, actions and outcomes:
+
+```
+Situation → Insight → Action → Outcome → Cognee → Future relevant context
+```
+
+Cognee is **not** the core transaction analytics engine. M2M calculates current
+intelligence; Cognee provides historical context.
+
+### LLM — explanation layer
+
+The LLM explains already-calculated intelligence and phrases recommendations. It
+is not responsible for calculating core metrics or detecting the underlying
+statistical pattern.
+
+```
+LlmProvider
+  ├── OpenRouter            (implemented)
+  └── Sarvam                (future / optional — not available today)
+```
+
+### n8n — action / orchestration layer
+
+n8n is not only a notification mechanism. It executes and orchestrates actions:
+
+```
+Recommendation → Merchant Approval → n8n → Execute Action → Track Action
+      → Measure Outcome → Store Outcome → Cognee
+```
+
+Two valid paths lead into n8n:
+
+```
+Indirect:  Opportunity → Recommendation → Approval → n8n
+Direct:    Merchant → Action → n8n
+```
+
+The direct path is triggered from the merchant's private experience (right side
+of the Merchant Dialog) without a separate approval step.
+
+### Outcome / learning loop
+
+```
+Action
+  ↓
+Experiment
+  ↓
+Outcome Measurement
+  ↓
+Store Outcome
+  ↓
+Cognee
+  ↓
+Future Intelligence
+  ↓
+Better contextual recommendations
+```
+
+This is the continuous learning loop.
+
+## Shared vs private intelligence
+
+The Merchant Dialog is split in two, and the backend mirrors that split:
+
+| | Left side | Right side |
+| --- | --- | --- |
+| Kind | Shared / network / Bazaar intelligence | Private merchant intelligence + actions |
+| Audience | The shared Bazaar experience | Only that merchant, through Paytm |
+| Data | Aggregated / anonymized | The merchant's own data, plus network insights relevant to them |
+| Can act | No | Yes — recommendations, decisions, n8n workflows, experiments |
+
+See [api.md](api.md#endpoint-groups) for which endpoints belong to which side.
+
 ## Dependency rules
 
-- `m2m-engine/` imports nothing outside itself. No React, no Next.js, no
-  browser APIs, no Supabase, no provider SDKs. It must stay runnable and
-  testable on its own.
+- `m2m-engine/` imports nothing outside itself except those adapter types. No
+  React, no Next.js, no browser APIs, no Supabase, no provider SDKs. It must
+  stay runnable and testable on its own.
+- The engine gets merchant data only through the `PaytmDataSource` interface,
+  passed in by its caller, and imports only the types in
+  `lib/paytm/adapter/types.ts` — a file with no imports — never `lib/supabase`
+  or table names. See [data-adapter.md](data-adapter.md).
 - Everything else may import `m2m-engine/` — that is where the shared domain
   vocabulary (`Merchant`, `Transaction`, `Area`) lives, precisely because it has
   no dependencies and therefore creates no cycles.
@@ -110,9 +272,14 @@ teach us the wrong habits.
 ## Current state
 
 Implemented: the Next.js app, the landing page, the domain vocabulary, the
-synthetic data source behind `lib/paytm/`, the Supabase clients, and the LLM
-boundary with an OpenRouter provider.
+database schema (synthetic Paytm-like data), the Supabase clients, the
+**Data Adapter** in `lib/paytm/` ([data-adapter.md](data-adapter.md)), the
+**M2M engine** in `m2m-engine/` ([m2m-engine.md](m2m-engine.md)) — metrics,
+cohorts, Bazaar/City aggregation, context, patterns, evidence, Bazaar Impact and
+opportunities — and the LLM boundary with an OpenRouter provider.
 
-Not implemented: cohorting, aggregation, pattern detection, the database schema,
-any API route, the Bazaar city, simulation, Ask Bazaar, Cognee recall, and n8n
+Not implemented: the Relevance Engine, any API route, the Bazaar city, simulation, Ask Bazaar, Cognee recall, and n8n
 actions. See [m2m-engine.md](m2m-engine.md) and [providers.md](providers.md).
+
+The endpoints in [api.md](api.md) are a **Planned API Contract**, agreed before
+implementation. None of them exist yet.

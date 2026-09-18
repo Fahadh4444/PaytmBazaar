@@ -1,37 +1,43 @@
 /**
- * Merchant data-source boundary.
+ * Paytm data-source boundary.
  *
- * Everything above this module asks for merchants without knowing where they
- * came from. Today that is synthetic data in `data/`. Later it may be Supabase,
- * or — only with authorized access — a real Paytm integration. Swapping the
- * source must not require changes above this file.
+ * Everything above this module asks for bazaars, merchants, payment events
+ * and daily metrics through `PaytmDataSource`, without knowing where they come
+ * from. Today the source is our Supabase prototype database holding synthetic
+ * Paytm-like data. If authorized access to a real Paytm API ever exists, it
+ * becomes another `PaytmDataSource` implementation, chosen here. Nothing above
+ * this file changes.
  *
  * No Paytm API endpoint is called or fabricated here.
  *
- * Functions are async even though the current source is in-memory, so the
- * signatures survive the move to a real backing store.
+ * Server-only: the Supabase implementation uses the secret key and returns
+ * merchants' private contact details. Client components may import types from
+ * here with `import type`, but must not call it.
  */
 
-import { areas, merchants } from "@/data/merchants";
-import type { Area, Merchant, MerchantCategory } from "@/m2m-engine";
+import { getSupabaseServerClient } from "@/lib/supabase/server";
 
-export interface MerchantQuery {
-  areaId?: string;
-  category?: MerchantCategory;
-}
+import { DataSourceError, PaytmSupabaseAdapter, type PaytmDataSource } from "./adapter";
 
-export async function getAreas(): Promise<Area[]> {
-  return areas;
-}
+export * from "./adapter/types";
+export * from "./adapter/errors";
 
-export async function getMerchants(query: MerchantQuery = {}): Promise<Merchant[]> {
-  return merchants.filter(
-    (merchant) =>
-      (query.areaId === undefined || merchant.areaId === query.areaId) &&
-      (query.category === undefined || merchant.category === query.category),
-  );
-}
+let dataSource: PaytmDataSource | null = null;
 
-export async function getMerchant(id: string): Promise<Merchant | null> {
-  return merchants.find((merchant) => merchant.id === id) ?? null;
+/**
+ * Returns the configured data source. It is created lazily, so a missing
+ * Supabase configuration only fails the request that needs data.
+ */
+export function getPaytmDataSource(): PaytmDataSource {
+  if (dataSource) return dataSource;
+
+  let client;
+  try {
+    client = getSupabaseServerClient();
+  } catch (cause) {
+    throw new DataSourceError("The Paytm data source is not configured.", { cause });
+  }
+
+  dataSource = new PaytmSupabaseAdapter(client);
+  return dataSource;
 }

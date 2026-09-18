@@ -1,0 +1,554 @@
+/*
+ * Shared shell for the Team and Idea dialogs.
+ *
+ * The landing screen is soft, dreamy and atmospheric. These panels are the
+ * opposite on purpose: a hard white slab with a heavy ink border and a solid
+ * offset shadow. The sky is the world; this is the instrument you read it with.
+ * Blue stays the single accent so it still belongs to Paytm Bazaar.
+ */
+
+.dialog {
+  --ink: #0d1b3e;
+  --accent: #0b57d0;
+  --paper: #ffffff;
+  --edge: 3px;
+  --drop: clamp(7px, 0.85vw, 12px);
+
+  width: min(560px, calc(100vw - 30px));
+  container-type: inline-size;
+  max-width: none;
+  max-height: none;
+  margin: auto;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  overflow: visible;
+  color: var(--ink);
+  font-family: var(--font-geist-sans), ui-sans-serif, system-ui, sans-serif;
+}
+
+.dialog.wide {
+  width: min(660px, calc(100vw - 30px));
+}
+
+/* Flat tint, not a soft vignette: the scene is pushed back, not dissolved. */
+.dialog::backdrop {
+  background: rgba(9, 28, 72, 0.56);
+  backdrop-filter: blur(10px) saturate(108%);
+  -webkit-backdrop-filter: blur(10px) saturate(108%);
+  animation: backdropIn 200ms linear both;
+}
+
+.dialog.closing::backdrop {
+  animation: backdropOut 140ms linear both;
+}
+
+.panel {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  max-height: calc(100dvh - 40px);
+  overflow: hidden;
+  border: var(--edge) solid var(--ink);
+  border-radius: 0;
+  background: var(--paper);
+  box-shadow: var(--drop) var(--drop) 0 var(--ink);
+  animation: panelIn 260ms cubic-bezier(0.18, 1.1, 0.32, 1) both;
+}
+
+.dialog.closing .panel {
+  animation: panelOut 140ms ease-in both;
+}
+
+.scroll {
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding: clamp(20px, 2.6vw, 30px);
+}
+
+.close {
+  position: absolute;
+  z-index: 2;
+  top: clamp(12px, 1.4vw, 18px);
+  right: clamp(12px, 1.4vw, 18px);
+  display: grid;
+  place-items: center;
+  width: 34px;
+  height: 34px;
+  border: 2px solid var(--ink);
+  border-radius: 0;
+  background: var(--paper);
+  color: var(--ink);
+  cursor: pointer;
+  transition: background 120ms linear, color 120ms linear;
+}
+
+.close:hover {
+  background: var(--ink);
+  color: var(--paper);
+}
+
+.close:focus-visible {
+  outline: 3px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.eyebrow {
+  margin: 0;
+  font-family: var(--font-geist-mono), ui-monospace, monospace;
+  font-size: clamp(10.5px, 0.95vw, 12px);
+  font-weight: 500;
+  letter-spacing: 0.24em;
+  text-transform: uppercase;
+  color: var(--accent);
+}
+
+.title {
+  margin: 8px 0 0;
+  font-size: clamp(24px, 2.6vw, 34px);
+  font-weight: 800;
+  line-height: 1.02;
+  letter-spacing: -0.02em;
+  text-transform: uppercase;
+  color: var(--ink);
+}
+
+.body {
+  margin-top: 18px;
+  font-size: clamp(14px, 1.15vw, 15.5px);
+  line-height: 1.62;
+  color: rgba(13, 27, 62, 0.78);
+}
+
+.body p {
+  margin: 0 0 12px;
+}
+
+.body p:last-child {
+  margin-bottom: 0;
+}
+
+.rule {
+  height: var(--edge);
+  margin: 18px 0;
+  border: 0;
+  background: var(--ink);
+}
+
+/* ------------------------------------------------------------------- team */
+
+.org {
+  margin: 0;
+  font-family: var(--font-geist-mono), ui-monospace, monospace;
+  font-size: clamp(15px, 1.4vw, 18px);
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--ink);
+}
+
+.people {
+  list-style: none;
+  margin: 16px 0 0;
+  padding: 0;
+  display: grid;
+  gap: 10px;
+}
+
+.person {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 4px 16px;
+  padding: 12px 14px;
+  border: 2px solid var(--ink);
+  background: var(--paper);
+  transition: transform 120ms linear, box-shadow 120ms linear;
+}
+
+.person:hover {
+  transform: translate(-2px, -2px);
+  box-shadow: 4px 4px 0 var(--accent);
+}
+
+.personName {
+  font-size: clamp(14.5px, 1.2vw, 16px);
+  font-weight: 650;
+  color: var(--ink);
+}
+
+.personMail {
+  font-family: var(--font-geist-mono), ui-monospace, monospace;
+  font-size: clamp(12px, 1vw, 13.5px);
+  color: var(--accent);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  text-decoration-thickness: 2px;
+}
+
+.personMail:hover {
+  background: var(--accent);
+  color: var(--paper);
+  text-decoration: none;
+}
+
+.personMail:focus-visible {
+  outline: 3px solid var(--accent);
+  outline-offset: 2px;
+}
+
+/* ------------------------------------------------------------------- idea */
+
+.statement {
+  margin: 0;
+  font-size: clamp(17px, 1.75vw, 22px);
+  font-weight: 700;
+  line-height: 1.28;
+  letter-spacing: -0.01em;
+  color: var(--ink);
+}
+
+.lede {
+  margin: 8px 0 0;
+  font-size: clamp(13.5px, 1.1vw, 15px);
+  line-height: 1.55;
+  color: rgba(13, 27, 62, 0.72);
+}
+
+/* One shop versus the street, said with squares instead of a paragraph. */
+.compare {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0;
+  margin-top: 14px;
+  border: 2px solid var(--ink);
+}
+
+.compareCell {
+  padding: 12px 13px 13px;
+}
+
+.compareCell + .compareCell {
+  border-left: 2px solid var(--ink);
+  background: rgba(11, 87, 208, 0.05);
+}
+
+.compareLabel {
+  margin: 0;
+  font-family: var(--font-geist-mono), ui-monospace, monospace;
+  font-size: clamp(10px, 0.9vw, 11px);
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: rgba(13, 27, 62, 0.6);
+}
+
+.grid {
+  display: grid;
+  grid-template-columns: repeat(6, 1fr);
+  gap: 4px;
+  margin: 9px 0 8px;
+}
+
+.cell,
+.cellOn,
+.cellSelf {
+  aspect-ratio: 1;
+  border: 1.5px solid rgba(13, 27, 62, 0.28);
+}
+
+.cellOn {
+  border-color: var(--accent);
+  background: var(--accent);
+}
+
+/* Your own shop stays marked in both panels, so the eye can anchor. */
+.cellSelf {
+  border-color: var(--ink);
+  background: var(--ink);
+}
+
+.gridLive .cellOn {
+  animation: cellWake 4s linear infinite;
+}
+
+.gridLive .cellOn:nth-child(6n + 1) {
+  animation-delay: 0ms;
+}
+
+.gridLive .cellOn:nth-child(6n + 2) {
+  animation-delay: 110ms;
+}
+
+.gridLive .cellOn:nth-child(6n + 3) {
+  animation-delay: 220ms;
+}
+
+.gridLive .cellOn:nth-child(6n + 4) {
+  animation-delay: 330ms;
+}
+
+.gridLive .cellOn:nth-child(6n + 5) {
+  animation-delay: 440ms;
+}
+
+.gridLive .cellOn:nth-child(6n) {
+  animation-delay: 550ms;
+}
+
+.compareNote {
+  margin: 0;
+  font-size: clamp(11.5px, 0.98vw, 13px);
+  line-height: 1.45;
+  color: rgba(13, 27, 62, 0.8);
+}
+
+.sectionLabel {
+  margin: 18px 0 8px;
+  font-family: var(--font-geist-mono), ui-monospace, monospace;
+  font-size: clamp(10.5px, 0.95vw, 12px);
+  letter-spacing: 0.24em;
+  text-transform: uppercase;
+  color: var(--accent);
+}
+
+.flow {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 0;
+  border: 2px solid var(--ink);
+}
+
+.step {
+  position: relative;
+  display: grid;
+  grid-template-columns: auto 1fr;
+  align-items: baseline;
+  gap: 12px;
+  padding: 10px 14px;
+  color: var(--ink);
+  /* The scan below flips each step in turn -- see stepScan. */
+  animation: stepScan 4s linear infinite;
+}
+
+.step + .step {
+  border-top: 2px solid var(--ink);
+}
+
+.stepNum {
+  font-family: var(--font-geist-mono), ui-monospace, monospace;
+  font-size: clamp(11px, 0.95vw, 12.5px);
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  opacity: 0.55;
+}
+
+.stepBody {
+  display: block;
+}
+
+.stepTitle {
+  display: block;
+  font-family: var(--font-geist-mono), ui-monospace, monospace;
+  font-size: clamp(11.5px, 1vw, 13px);
+  font-weight: 600;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+}
+
+.stepNote {
+  display: block;
+  margin-top: 3px;
+  font-size: clamp(12.5px, 1.05vw, 14px);
+  line-height: 1.45;
+  opacity: 0.78;
+}
+
+.loopBack {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  margin: 10px 0 0;
+  padding: 0 2px;
+  font-size: clamp(12px, 1vw, 13.5px);
+  line-height: 1.45;
+  color: var(--accent);
+  animation: loopWake 4s linear infinite;
+  animation-delay: 2.75s;
+}
+
+.privacy {
+  margin-top: 14px;
+  padding: 13px 15px;
+  border: 2px solid var(--ink);
+  background: var(--ink);
+  font-size: clamp(12.5px, 1.05vw, 14px);
+  line-height: 1.55;
+  color: var(--paper);
+}
+
+@container (max-width: 470px) {
+  .compare {
+    grid-template-columns: 1fr;
+  }
+
+  .compareCell + .compareCell {
+    border-left: 0;
+    border-top: 2px solid var(--ink);
+  }
+}
+
+/* ----------------------------------------------- the simulation, running */
+
+/* Rows print in, fast and in order. */
+.people li {
+  animation: rowIn 180ms linear both;
+}
+
+.people li:nth-child(1) {
+  animation-delay: 140ms;
+}
+
+.people li:nth-child(2) {
+  animation-delay: 200ms;
+}
+
+/* One pass of the scan travels down the chain and closes the loop, then rests. */
+.flow li:nth-child(1) {
+  animation-delay: 1s;
+}
+
+.flow li:nth-child(2) {
+  animation-delay: 1.45s;
+}
+
+.flow li:nth-child(3) {
+  animation-delay: 1.9s;
+}
+
+.flow li:nth-child(4) {
+  animation-delay: 2.35s;
+}
+
+/* -------------------------------------------------------------- keyframes */
+
+@keyframes panelIn {
+  from {
+    opacity: 0;
+    transform: translate(calc(var(--drop) * -0.6), calc(var(--drop) * 1.4));
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@keyframes panelOut {
+  from {
+    opacity: 1;
+    transform: none;
+  }
+  to {
+    opacity: 0;
+    transform: translate(0, 8px);
+  }
+}
+
+@keyframes rowIn {
+  from {
+    opacity: 0;
+    transform: translateX(-8px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+/* Hard flip rather than a fade: the block is either being read or it is not. */
+@keyframes stepScan {
+  0%,
+  4.9% {
+    background-color: #ffffff;
+    color: #0d1b3e;
+  }
+  5%,
+  16% {
+    background-color: #0b57d0;
+    color: #ffffff;
+  }
+  16.1%,
+  100% {
+    background-color: #ffffff;
+    color: #0d1b3e;
+  }
+}
+
+@keyframes cellWake {
+  0%,
+  8% {
+    opacity: 0.32;
+  }
+  16%,
+  70% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0.32;
+  }
+}
+
+@keyframes loopWake {
+  0%,
+  4.9% {
+    opacity: 0.5;
+  }
+  5%,
+  16% {
+    opacity: 1;
+  }
+  16.1%,
+  100% {
+    opacity: 0.5;
+  }
+}
+
+@keyframes backdropIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes backdropOut {
+  from {
+    opacity: 1;
+  }
+  to {
+    opacity: 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .panel,
+  .dialog::backdrop,
+  .dialog.closing .panel,
+  .dialog.closing::backdrop,
+  .people li,
+  .flow li,
+  .loopBack,
+  .gridLive .cellOn {
+    animation-duration: 1ms !important;
+    animation-delay: 0ms !important;
+    animation-iteration-count: 1 !important;
+  }
+
+  .person,
+  .close {
+    transition-duration: 1ms !important;
+  }
+}

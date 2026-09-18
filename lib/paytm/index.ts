@@ -17,12 +17,34 @@
 
 import { getSupabaseServerClient } from "@/lib/supabase/server";
 
-import { DataSourceError, PaytmSupabaseAdapter, type PaytmDataSource } from "./adapter";
+import {
+  DataSourceError,
+  PaytmSupabaseAdapter,
+  SupabaseMerchantActionStore,
+  type MerchantActionStore,
+  type PaytmDataSource,
+} from "./adapter";
 
 export * from "./adapter/types";
 export * from "./adapter/errors";
+export * from "./adapter/actions";
 
 let dataSource: PaytmDataSource | null = null;
+let actionStore: MerchantActionStore | null = null;
+
+function serverClient() {
+  try {
+    return getSupabaseServerClient();
+  } catch (cause) {
+    throw new DataSourceError("The Paytm data source is not configured.", { cause });
+  }
+}
+
+/** Store for Bazaar's recommended actions and their outcomes (`merchant_actions`). */
+export function getMerchantActionStore(): MerchantActionStore {
+  actionStore ??= new SupabaseMerchantActionStore(serverClient());
+  return actionStore;
+}
 
 /**
  * Returns the configured data source. It is created lazily, so a missing
@@ -31,13 +53,6 @@ let dataSource: PaytmDataSource | null = null;
 export function getPaytmDataSource(): PaytmDataSource {
   if (dataSource) return dataSource;
 
-  let client;
-  try {
-    client = getSupabaseServerClient();
-  } catch (cause) {
-    throw new DataSourceError("The Paytm data source is not configured.", { cause });
-  }
-
-  dataSource = new PaytmSupabaseAdapter(client);
+  dataSource = new PaytmSupabaseAdapter(serverClient());
   return dataSource;
 }

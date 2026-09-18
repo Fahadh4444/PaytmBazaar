@@ -11,7 +11,12 @@ import "server-only";
 import { LlmError, type LlmProvider, type LlmRequest, type LlmResponse } from "./types";
 
 const OPENROUTER_CHAT_COMPLETIONS_URL = "https://openrouter.ai/api/v1/chat/completions";
-const DEFAULT_MODEL = "deepseek/deepseek-v4-flash";
+export const DEFAULT_MODEL = "deepseek/deepseek-v4-flash";
+
+/** The model requests go to unless a request names one. */
+export function openRouterModel(): string {
+  return process.env.OPENROUTER_MODEL || DEFAULT_MODEL;
+}
 const REQUEST_TIMEOUT_MS = 30_000;
 
 interface OpenRouterChoice {
@@ -49,13 +54,15 @@ export const openRouterProvider: LlmProvider = {
           "X-Title": "Paytm Bazaar",
         },
         body: JSON.stringify({
-          model: request.model ?? process.env.OPENROUTER_MODEL ?? DEFAULT_MODEL,
+          model: request.model ?? openRouterModel(),
           messages: request.messages,
           temperature: request.temperature,
           max_tokens: request.maxTokens,
+          response_format: request.responseFormat ? { type: request.responseFormat } : undefined,
+          reasoning: request.reasoning === false ? { enabled: false } : undefined,
         }),
         cache: "no-store",
-        signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
+        signal: AbortSignal.timeout(request.timeoutMs ?? REQUEST_TIMEOUT_MS),
       });
     } catch (cause) {
       throw new LlmError("Could not reach OpenRouter.", "openrouter", { cause });

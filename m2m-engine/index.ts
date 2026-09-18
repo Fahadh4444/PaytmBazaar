@@ -35,6 +35,23 @@ export { buildEvidence } from "./evidence";
 export { calculateBazaarImpact } from "./impact";
 export { detectOpportunities } from "./opportunities";
 export { analyzeMerchant, buildM2MIntelligence, type AnalyzeMerchantInput, type M2MSnapshot } from "./analyze";
+export {
+  bazaarIntelligence,
+  cityIntelligence,
+  dailyTrend,
+  growthBreakdown,
+  performanceCounts,
+  weekPattern,
+  type AreaImpact,
+  type AreaIntelligence,
+  type AreaMetrics,
+  type GrowthBar,
+  type GrowthBreakdown,
+  type PerformanceBand,
+  type PerformanceCount,
+  type TrendPoint,
+  type WeekPattern,
+} from "./network";
 
 /** Whether an aggregate over this many merchants (excluding the viewer) may be surfaced at all. */
 export function isCohortReportable(cohortSize: number): boolean {

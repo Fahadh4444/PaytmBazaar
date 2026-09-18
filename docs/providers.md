@@ -14,8 +14,8 @@ on the boundary. Provider details do not leak past it.
 | Supabase | PostgreSQL, structured facts | Schema + clients implemented; read through the [Data Adapter](data-adapter.md) |
 | OpenRouter | LLM provider | Implemented |
 | Sarvam | Possible future LLM / voice / multilingual | **Not integrated** — no confirmed access |
-| Cognee | Contextual memory | Boundary only — not implemented |
-| n8n | Action orchestration | Boundary only — not implemented |
+| Cognee | Contextual memory | Implemented (`MemoryProvider` over the REST API); needs credentials — see [intelligence-pipeline.md](intelligence-pipeline.md) |
+| n8n | Action orchestration | Implemented (`ActionExecutor` via one webhook workflow); needs an n8n instance |
 | Paytm | Intended data source | **No authorized access** — synthetic data in Supabase behind `PaytmDataSource` |
 
 Nothing in this repository calls a Paytm API, and none of the demo data is real
@@ -49,9 +49,10 @@ Raw transactions belong in PostgreSQL. Deterministic analytics belong in the
 engine. Cognee is for retrieving relevant history and relationships — "last time
 evening sales dropped, what worked?"
 
-Not implemented yet: we have credits but have not confirmed the API surface
-against real credentials. `isCogneeConfigured()` is the whole boundary today.
-Cognee is optional and must stay optional.
+Implemented in `lib/cognee/` as a `MemoryProvider` over Cognee's documented
+REST API (add → cognify → search), one dataset per merchant. Cognee is
+optional and stays optional: without it, insights are generated without
+history.
 
 ## n8n
 

@@ -21,7 +21,18 @@ export interface LlmRequest {
   /** Provider-agnostic hint; each provider maps it to a concrete model. */
   model?: string;
   temperature?: number;
+  /** Upper bound on the length of the completion. */
   maxTokens?: number;
+  /** Ask for a JSON object instead of free text, where the provider supports it. */
+  responseFormat?: "json_object";
+  /** Overrides the provider's default request timeout, in milliseconds. */
+  timeoutMs?: number;
+  /**
+   * `false` turns off hidden "thinking" on models that support it. Reasoning
+   * tokens count against `maxTokens`, so a reasoning model can otherwise spend
+   * the whole budget thinking and return no answer.
+   */
+  reasoning?: boolean;
 }
 
 export interface LlmResponse {

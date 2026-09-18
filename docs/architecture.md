@@ -80,9 +80,23 @@ A request uses only the layers it needs. A numeric comparison does not call an
 LLM. A database read does not call Cognee. A recommendation with no external
 effect does not call n8n.
 
+## Complete pipeline (implemented)
+
+```
+Supabase → Data Adapter → M2M → Relevance → Merchant Intelligence service
+  → Cognee (history) → LLM (explanation) → Recommendation
+  → merchant approval → n8n → Outcome → Supabase + Cognee
+```
+
+The end-to-end vertical slice is implemented. See
+[intelligence-pipeline.md](intelligence-pipeline.md) for each layer's
+responsibility, the LLM/Cognee/n8n abstractions, the approval flow, failure
+behaviour, privacy and setup.
+
 ## Backend intelligence flow (agreed design)
 
-> **Status: planned, not implemented.** This is the finalized target flow. The
+> **Status: implemented** — see [intelligence-pipeline.md](intelligence-pipeline.md).
+> Earlier status note: planned, not implemented. This is the finalized target flow. The
 > user-facing journey is in [flow.md](flow.md); the endpoint contract is in
 > [api.md](api.md) (Planned API Contract).
 
@@ -96,6 +110,8 @@ Data Normalization
 Intelligence Layer           m2m-engine       ← implemented
         ↓
 Structured Intelligence
+        ↓
+Relevance Engine             relevance-engine ← implemented
         ↓
 Cognee + LLM                 lib/cognee, lib/llm
         ↓
@@ -132,8 +148,9 @@ merchant (see [Privacy](#privacy)).
 
 ### Intelligence layer components
 
-> **Status: implemented** (except the Relevance Engine). Details in
-> [m2m-engine.md](m2m-engine.md).
+> **Status: implemented.** Components 1–8 and 10 are in `m2m-engine/`
+> ([m2m-engine.md](m2m-engine.md)). The Relevance Engine (9) is a separate
+> layer in `relevance-engine/` ([relevance-engine.md](relevance-engine.md)).
 
 | # | Component | Responsibility | Where |
 | --- | --- | --- | --- |
@@ -145,7 +162,7 @@ merchant (see [Privacy](#privacy)).
 | 6 | Pattern Detection | Deterministic rules over comparisons and context | `patterns.ts` |
 | 7 | Cross-Level Comparison | Merchant vs cohort vs Bazaar vs City | `comparison.ts` |
 | 8 | Evidence Engine | The figures behind every finding | `evidence.ts` |
-| 9 | Relevance Engine | Decide which network intelligence matters to a merchant | not yet built |
+| 9 | Relevance Engine | Rank M2M findings by what matters to this merchant now | `relevance-engine/` |
 | 10 | Opportunity Engine | Structured opportunities, including **Bazaar Impact** | `impact.ts`, `opportunities.ts` |
 
 `analyzeMerchant()` runs the whole pipeline and returns one `M2MIntelligence`
@@ -278,7 +295,11 @@ database schema (synthetic Paytm-like data), the Supabase clients, the
 cohorts, Bazaar/City aggregation, context, patterns, evidence, Bazaar Impact and
 opportunities — and the LLM boundary with an OpenRouter provider.
 
-Not implemented: the Relevance Engine, any API route, the Bazaar city, simulation, Ask Bazaar, Cognee recall, and n8n
+Implemented on top of M2M: the **Relevance Engine** in `relevance-engine/`
+([relevance-engine.md](relevance-engine.md)), which ranks M2M findings for the
+future LLM layer.
+
+Not implemented: any API route, the Bazaar city, simulation, Ask Bazaar, Cognee recall, and n8n
 actions. See [m2m-engine.md](m2m-engine.md) and [providers.md](providers.md).
 
 The endpoints in [api.md](api.md) are a **Planned API Contract**, agreed before

@@ -9,7 +9,7 @@
 
 import "server-only";
 
-import { openRouterProvider } from "./openrouter";
+import { openRouterModel, openRouterProvider } from "./openrouter";
 import { LlmError, type LlmProvider } from "./types";
 
 export * from "./types";
@@ -46,6 +46,6 @@ export function getLlmStatus() {
   return {
     provider: provider.name,
     configured: provider.isConfigured(),
-    model: process.env.OPENROUTER_MODEL ?? "deepseek/deepseek-v4-flash",
+    model: provider.name === "openrouter" ? openRouterModel() : "unknown",
   };
 }

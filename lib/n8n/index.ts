@@ -2,6 +2,9 @@
 
 import "server-only";
 
+import type { ActionExecutor } from "./types";
+import { n8nWebhookExecutor } from "./webhook";
+
 const REQUEST_TIMEOUT_MS = 15_000;
 
 export type N8nConnectionStatus = {
@@ -47,4 +50,17 @@ export async function checkN8nConnection(): Promise<N8nConnectionStatus> {
   }
 
   return { service: "n8n", configured: true, reachable: true, status: response.status };
+}
+
+// --- Action execution ---------------------------------------------------------
+//
+// Approved merchant actions run through one Webhook-triggered workflow
+// (n8n/workflows/bazaar-merchant-action.json). Product code depends on this
+// file, never on `webhook.ts`.
+
+export * from "./types";
+export { n8nWebhookExecutor, n8nWebhookUrl } from "./webhook";
+
+export function getActionExecutor(): ActionExecutor {
+  return n8nWebhookExecutor;
 }

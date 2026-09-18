@@ -2,6 +2,9 @@
 
 import "server-only";
 
+import { cogneeProvider } from "./cognee";
+import type { MemoryProvider } from "./types";
+
 const DEFAULT_BASE_URL = "https://api.cognee.ai";
 const REQUEST_TIMEOUT_MS = 15_000;
 
@@ -51,4 +54,17 @@ export async function checkCogneeConnection(): Promise<CogneeConnectionStatus> {
   }
 
   return { service: "cognee", configured: true, reachable: true, status: response.status };
+}
+
+// --- Merchant memory ----------------------------------------------------------
+//
+// Structured memories of past situations, recommendations, actions and
+// outcomes. Product code depends on this file, never on `cognee.ts`, so the
+// memory provider can be swapped without touching callers.
+
+export * from "./types";
+export { cogneeProvider, merchantDataset } from "./cognee";
+
+export function getMemoryProvider(): MemoryProvider {
+  return cogneeProvider;
 }

@@ -90,5 +90,7 @@ it through an API route and showing it in the Merchant Dialog.
 - [Planned API contract](docs/api.md) — proposed endpoints, not yet implemented
 - [Data Adapter](docs/data-adapter.md) — how merchant data is read; the M2M engine's only data dependency (implemented)
 - [M2M engine](docs/m2m-engine.md) — pipeline, metrics, cohorts, patterns, output contract (implemented)
+- [Relevance Engine](docs/relevance-engine.md) — which M2M findings matter to a merchant now, and why (implemented)
+- [Intelligence pipeline](docs/intelligence-pipeline.md) — end to end: M2M → Relevance → Cognee → LLM → approval → n8n → outcome (implemented)
 - [Provider strategy](docs/providers.md) — external integrations and failure handling
 - [Local development](docs/development.md) — setup, scripts, branching, parallel work

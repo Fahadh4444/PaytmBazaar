@@ -1,0 +1,47 @@
+{
+  "name": "Paytm Bazaar — merchant action",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "bazaar-merchant-action",
+        "authentication": "headerAuth",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "5f0c7b1e-1a1e-4b7a-9c43-0d6f1b2a3c01",
+      "name": "Bazaar action webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [0, 0],
+      "webhookId": "bazaar-merchant-action"
+    },
+    {
+      "parameters": {
+        "jsCode": "const action = $input.first().json.body;\nif (action.type !== 'SCHEDULE_PROMOTION') {\n  throw new Error('Unsupported action type: ' + action.type);\n}\nconst p = action.parameters;\nconst start = new Date();\nconst end = new Date(start.getTime() + p.durationDays * 86400000);\nreturn [{ json: {\n  actionId: action.actionId,\n  merchantId: action.merchantId,\n  promotion: {\n    segment: p.targetSegment,\n    channel: p.channel,\n    startsAt: start.toISOString(),\n    endsAt: end.toISOString(),\n    message: action.description\n  }\n} }];"
+      },
+      "id": "5f0c7b1e-1a1e-4b7a-9c43-0d6f1b2a3c02",
+      "name": "Schedule promotion",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [260, 0]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ { \"status\": \"executed\", \"reference\": $execution.id, \"detail\": \"Promotion scheduled: \" + $json.promotion.segment + \" until \" + $json.promotion.endsAt } }}",
+        "options": {}
+      },
+      "id": "5f0c7b1e-1a1e-4b7a-9c43-0d6f1b2a3c03",
+      "name": "Confirm execution",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [520, 0]
+    }
+  ],
+  "connections": {
+    "Bazaar action webhook": { "main": [[{ "node": "Schedule promotion", "type": "main", "index": 0 }]] },
+    "Schedule promotion": { "main": [[{ "node": "Confirm execution", "type": "main", "index": 0 }]] }
+  },
+  "settings": { "executionOrder": "v1" }
+}

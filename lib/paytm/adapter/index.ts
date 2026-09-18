@@ -10,6 +10,7 @@
 export * from "./types";
 export * from "./errors";
 export { MAX_PAGE_SIZE } from "./validation";
+export * from "./actions";
 export {
   DEFAULT_MAX_ROWS,
   PaytmSupabaseAdapter,

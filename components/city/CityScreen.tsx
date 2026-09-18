@@ -341,8 +341,7 @@ export default function CityScreen() {
       <AnalysisDialog
         eyebrow="Bazaar Analysis"
         title={analyzing ? analyzing.name : "Bazaar"}
-        lede="This is the window the M2M engine reports into. It will read the Bazaar's activity under the contextual state below."
-        context={context}
+        scope={{ kind: "bazaar", id: analyzing?.id ?? "" }}
         open={analyzing !== null}
         onClose={() => setAnalyzing(null)}
       />
@@ -350,8 +349,7 @@ export default function CityScreen() {
       <AnalysisDialog
         eyebrow="City Analysis"
         title="Bengaluru"
-        lede="Every Bazaar in the city, read together. The M2M engine will report here on the network as a whole, under the contextual state below."
-        context={context}
+        scope={{ kind: "city" }}
         open={cityAnalysis}
         onClose={() => setCityAnalysis(false)}
       />

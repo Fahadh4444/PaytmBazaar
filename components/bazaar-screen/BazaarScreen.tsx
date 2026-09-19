@@ -139,6 +139,7 @@ export default function BazaarScreen({ bazaar }: { bazaar: Bazaar }) {
         scope={{ kind: "bazaar", id: bazaar.id }}
         open={pulseOpen}
         onClose={() => setPulseOpen(false)}
+        sceneContext={context}
       />
 
       <MerchantDialog

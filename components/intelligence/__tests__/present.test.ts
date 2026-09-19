@@ -114,7 +114,10 @@ describe("frontend boundary", () => {
   it("no UI code touches Supabase, the Data Adapter or runtime intelligence", () => {
     for (const file of [...files("components"), ...files("app")]) {
       const source = readFileSync(file, "utf8");
-      assert.ok(!/supabase/i.test(source), `${file} mentions Supabase`);
+      // The System Flow's copy names Supabase as the data store; it is still held to the import checks below.
+      const describesArchitecture = file === join("components", "intelligence", "inspect", "flow.ts");
+      if (!describesArchitecture) assert.ok(!/supabase/i.test(source), `${file} mentions Supabase`);
+      assert.ok(!/from\s+"[^"]*supabase/i.test(source), `${file} imports Supabase`);
       assert.ok(!/from "@\/lib\/(paytm|supabase)/.test(source), `${file} imports the Data Adapter`);
       for (const match of source.matchAll(/import\s+(?!type\b)[^;]*from\s+"@\/(m2m-engine|relevance-engine|merchant-intelligence)[^"]*"/g)) {
         assert.fail(`${file} imports runtime intelligence: ${match[0]}`);

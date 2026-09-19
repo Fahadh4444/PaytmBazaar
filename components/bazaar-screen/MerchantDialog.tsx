@@ -7,6 +7,7 @@ import { contextQuery, intelligenceContext, type CityContext } from "@/component
 import { shops, type Shop } from "@/data/shops";
 import { GrowthBars } from "@/components/intelligence/Charts";
 import ist from "@/components/intelligence/intelligence.module.css";
+import DialogTools from "@/components/intelligence/inspect/DialogTools";
 import { describeTopSignal, followUpQuestions, formatGrowth, merchantForBuilding } from "@/components/intelligence/present";
 import RichText, { inline } from "@/components/intelligence/RichText";
 import type {
@@ -88,6 +89,7 @@ export default function MerchantDialog({
   const [actionState, setActionState] = useState<"idle" | "running" | "done">("idle");
   const [actionResult, setActionResult] = useState<string | null>(null);
   const [measured, setMeasured] = useState<MeasuredOutcome | null>(null);
+  const [approval, setApproval] = useState<ActionExecutionOutcome | null>(null);
   const [resultNote, setResultNote] = useState<string | null>(null);
   const [view, setView] = useState<"intelligence" | "simulation">("intelligence");
   const [simulation, setSimulation] = useState<MerchantBasics | null>(null);
@@ -196,6 +198,7 @@ export default function MerchantDialog({
       });
       if (!response.ok && response.status !== 502) throw new Error(await readError(response, "The offer could not be started."));
       const outcome = (await response.json()) as ActionExecutionOutcome;
+      setApproval(outcome);
       const started = outcome.execution?.status === "executed" || outcome.execution === null;
       setActionResult(
         outcome.execution?.status === "executed"
@@ -243,6 +246,8 @@ export default function MerchantDialog({
   const executedAt =
     recommendation?.status === "proposed" ? recommendation.execution?.executedAt ?? null : null;
   const running = recommendation?.status === "proposed" && (recommendation.actionStatus === "executed" || actionState === "done");
+  const title = basics?.merchant.name ?? (shop ? shop.name : "Merchant");
+
   const behaviour = (item: SelectedContextEvidence, label: string) => {
     if (!item.supported || item.merchantGrowth === null || item.cohortGrowth === null || item.gapPp === null) {
       return `Not enough historical evidence for ${label}.`;
@@ -329,8 +334,25 @@ export default function MerchantDialog({
       open={open}
       onClose={onClose}
       eyebrow="Merchant intelligence"
-      title={basics?.merchant.name ?? (shop ? shop.name : "Merchant")}
+      title={title}
       workspace
+      tools={
+        open ? (
+          <DialogTools
+            subject={title}
+            scene={context}
+            source={{
+              scope: "merchant",
+              basics,
+              explanation,
+              basicsLoading: analysisLoading,
+              explanationLoading: summaryLoading,
+              error: analysisError,
+              live: { approval, measured },
+            }}
+          />
+        ) : null
+      }
     >
       <p className={styles.dialogLede}>{bazaarName}</p>
 

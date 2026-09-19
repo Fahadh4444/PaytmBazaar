@@ -10,18 +10,28 @@ import styles from "./intelligence.module.css";
 
 export type AreaScope = { kind: "city" } | { kind: "bazaar"; id: string };
 
-function endpoint(scope: AreaScope): string {
+export function areaEndpoint(scope: AreaScope): string {
   return scope.kind === "city" ? "/api/city/intelligence" : `/api/bazaars/${encodeURIComponent(scope.id)}/intelligence`;
 }
+
+/** What the panel is showing, so the dialog's Trace and Flow read the same response. */
+export type AreaResult = { endpoint: string; state: LoadState; data: AreaIntelligence | null };
 
 /**
  * What is happening across the city, or in one Bazaar: a headline, four
  * numbers and a few small charts, all from the backend. Nothing is computed
  * here.
  */
-export default function AreaIntelligencePanel({ scope }: { scope: AreaScope }) {
+export default function AreaIntelligencePanel({
+  scope,
+  onResult,
+}: {
+  scope: AreaScope;
+  onResult?: (result: AreaResult) => void;
+}) {
   const [attempt, setAttempt] = useState(0);
-  const key = `${endpoint(scope)}#${attempt}`;
+  const url = areaEndpoint(scope);
+  const key = `${url}#${attempt}`;
   const [result, setResult] = useState<{ key: string; state: LoadState; data: AreaIntelligence | null }>({
     key,
     state: "loading",
@@ -34,14 +44,17 @@ export default function AreaIntelligencePanel({ scope }: { scope: AreaScope }) {
       .then(async (response) => {
         if (!response.ok) throw new Error("unavailable");
         const data = (await response.json()) as AreaIntelligence;
-        setResult({ key, state: data.metrics.current.growth === null ? "empty" : "ready", data });
+        const state = data.metrics.current.growth === null ? "empty" : "ready";
+        setResult({ key, state, data });
+        onResult?.({ endpoint: url, state, data });
       })
       .catch((error: unknown) => {
         if (error instanceof DOMException && error.name === "AbortError") return;
         setResult({ key, state: "error", data: null });
+        onResult?.({ endpoint: url, state: "error", data: null });
       });
     return () => controller.abort();
-  }, [key]);
+  }, [key, url, onResult]);
 
   const state = result.key === key ? result.state : "loading";
   const data = result.key === key ? result.data : null;
@@ -67,7 +80,14 @@ export default function AreaIntelligencePanel({ scope }: { scope: AreaScope }) {
       <div className={styles.panel}>
         <div className={styles.stateBox}>
           <p style={{ margin: 0 }}>{areaStateMessage(kind, "error")}</p>
-          <button type="button" className={styles.retry} onClick={() => setAttempt((n) => n + 1)}>
+          <button
+            type="button"
+            className={styles.retry}
+            onClick={() => {
+              setAttempt((n) => n + 1);
+              onResult?.({ endpoint: url, state: "loading", data: null });
+            }}
+          >
             Try again
           </button>
         </div>

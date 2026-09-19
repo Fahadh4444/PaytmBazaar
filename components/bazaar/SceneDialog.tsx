@@ -16,6 +16,13 @@ type SceneDialogProps = {
   wide?: boolean;
   /** Full dashboard width for analysis and conversational workspaces. */
   workspace?: boolean;
+  /**
+   * A smaller inspection layer opened over another dialog: lighter backdrop,
+   * so the dialog underneath stays visible.
+   */
+  inspector?: boolean;
+  /** Compact controls shown beside the close button. */
+  tools?: ReactNode;
   children: ReactNode;
 };
 
@@ -33,6 +40,8 @@ export default function SceneDialog({
   title,
   wide = false,
   workspace = false,
+  inspector = false,
+  tools,
   children,
 }: SceneDialogProps) {
   const ref = useRef<HTMLDialogElement>(null);
@@ -86,6 +95,7 @@ export default function SceneDialog({
         styles.dialog,
         wide && styles.wide,
         workspace && styles.workspace,
+        inspector && styles.inspector,
         closing && styles.closing,
       ]
         .filter(Boolean)
@@ -95,7 +105,8 @@ export default function SceneDialog({
         if (event.target === ref.current) requestClose();
       }}
     >
-      <div className={styles.panel}>
+      <div className={styles.panel} data-tools={tools ? "" : undefined}>
+        {tools && <div className={styles.tools}>{tools}</div>}
         <button type="button" className={styles.close} onClick={requestClose} aria-label="Close">
           <svg
             viewBox="0 0 24 24"

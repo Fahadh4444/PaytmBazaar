@@ -549,6 +549,18 @@ describe("privacy boundaries", () => {
     assert.ok(promptFacts(requests[0]).every((f) => typeof f.value === "number"));
   });
 
+  it("still runs an offer saved before delivery moved to email", async () => {
+    const store = new InMemoryActionStore();
+    const executor = fakeExecutor();
+    const d = deps({ actions: store, executor: executor.executor });
+    const id = await proposed(d);
+    const record = store.records.get(id)!;
+    store.records.set(id, { ...record, parameters: { ...record.parameters, channel: "paytm_merchant_notification" } });
+    const outcome = await executeApprovedAction(d, { merchantId: "TARGET", actionId: id, approved: true });
+    assert.equal(outcome.action.status, "executed");
+    assert.equal(executor.calls[0].parameters.channel, "email");
+  });
+
   it("does not let one merchant run another merchant's action", async () => {
     const d = deps({ actions: new InMemoryActionStore() });
     const id = await proposed(d);

@@ -40,6 +40,29 @@
   max-height: none;
 }
 
+/*
+ * The inspection layer: a smaller slab over a dialog that stays open. The
+ * backdrop only dims, without blur, so the dialog underneath is still read.
+ */
+.dialog.inspector {
+  width: min(640px, calc(100vw - 48px));
+  --drop: clamp(6px, 0.7vw, 9px);
+}
+
+.dialog.inspector::backdrop {
+  background: rgba(9, 28, 72, 0.3);
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+}
+
+.dialog.inspector .panel {
+  max-height: min(820px, calc(100dvh - 48px));
+}
+
+.dialog.inspector .title {
+  font-size: clamp(19px, 2vw, 25px);
+}
+
 /* Flat tint, not a soft vignette: the scene is pushed back, not dissolved. */
 .dialog::backdrop {
   background: rgba(9, 28, 72, 0.56);
@@ -100,6 +123,32 @@
 .close:focus-visible {
   outline: 3px solid var(--accent);
   outline-offset: 2px;
+}
+
+/* Trace / Flow: small ink-bordered keys that sit left of the close button. */
+.tools {
+  position: absolute;
+  z-index: 2;
+  top: clamp(12px, 1.4vw, 18px);
+  right: calc(clamp(12px, 1.4vw, 18px) + 34px + 8px);
+  display: flex;
+  gap: 6px;
+}
+
+.panel[data-tools] .eyebrow,
+.panel[data-tools] .title {
+  padding-right: 178px;
+}
+
+@container (max-width: 520px) {
+  .panel[data-tools] .eyebrow {
+    padding-right: 116px;
+  }
+
+  .panel[data-tools] .title {
+    margin-top: 16px;
+    padding-right: 0;
+  }
 }
 
 .eyebrow {

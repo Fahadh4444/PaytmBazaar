@@ -78,7 +78,8 @@ const promotionSchema = z
   .object({
     targetSegment: z.enum(["morning", "afternoon", "evening", "night", "all_day"]),
     durationDays: z.number().int().min(1).max(30),
-    channel: z.literal("email"),
+    // Offers saved before delivery moved to email used the in-app channel; they are now delivered by email.
+    channel: z.enum(["email", "paytm_merchant_notification"]).transform(() => "email" as const),
   })
   .strict();
 

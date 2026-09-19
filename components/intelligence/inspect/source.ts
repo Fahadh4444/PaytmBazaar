@@ -5,7 +5,7 @@
  */
 
 import type { AreaIntelligence } from "@/m2m-engine";
-import type { ActionExecutionOutcome, MeasuredOutcome, MerchantBasics, MerchantExplanation } from "@/merchant-intelligence";
+import type { ActionExecutionOutcome, AskResult, MeasuredOutcome, MerchantBasics, MerchantExplanation } from "@/merchant-intelligence";
 
 import type { LoadState } from "../present";
 import { buildAreaTrace, buildMerchantTrace, type SceneContext, type TraceModel } from "./trace";
@@ -13,6 +13,8 @@ import { buildAreaTrace, buildMerchantTrace, type SceneContext, type TraceModel 
 export interface LiveAction {
   approval: ActionExecutionOutcome | null;
   measured: MeasuredOutcome | null;
+  /** The latest Ask Bazaar answer and the question it answered. */
+  ask?: (AskResult & { question: string }) | null;
 }
 
 export type InspectSource =

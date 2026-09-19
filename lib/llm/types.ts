@@ -1,9 +1,10 @@
 /**
  * The LLM boundary.
  *
- * Product code depends on this file, never on a provider. OpenRouter is the
- * current provider; Sarvam may become one later. Adding or switching a provider
- * must not require touching the M2M engine, the API routes, or the UI.
+ * Product code depends on this file, never on a provider. Sarvam (Sarvam 105B)
+ * and OpenRouter are implemented; lib/llm/index.ts picks one and falls back to
+ * the other. Adding or switching a provider must not require touching the M2M
+ * engine, the API routes, or the UI.
  *
  * The LLM explains intelligence. It is never the source of a number — see
  * docs/m2m-engine.md.
@@ -37,8 +38,10 @@ export interface LlmRequest {
 
 export interface LlmResponse {
   text: string;
-  /** Which provider actually answered. Useful once fallback exists. */
+  /** Which provider actually answered (after any fallback). */
   provider: string;
+  /** The model that answered, when the provider reports it. */
+  model?: string;
 }
 
 export interface LlmProvider {

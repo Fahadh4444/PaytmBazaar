@@ -1,26 +1,27 @@
+import { answer, conversationFrom, conversationIdFrom, validMerchantId } from "@/app/api/_lib/ask";
 import { badRequest, errorResponse, readJson } from "@/app/api/_lib/errors";
-import { answerMerchantQuestion, validChatMessages } from "@/merchant-intelligence/chat";
-import { getIntelligenceDeps } from "@/merchant-intelligence/server";
-import { contextFromUrl } from "@/merchant-intelligence/context-request";
 
 export const dynamic = "force-dynamic";
+export const maxDuration = 60;
 
 /**
- * POST /api/merchants/:merchantId/chat
- * Body: { "messages": [{ "role": "user" | "assistant", "content": string }] }
+ * POST /api/merchants/:merchantId/chat          (Ask Bazaar, typed)
+ * Body: { "message": string, "history"?: [{ "role", "content" }], "conversationId"?: string }
+ *   (older clients: { "messages": [...] })
  *
- * Answers the merchant's questions from their own M2M and relevance facts.
+ * Answers from the merchant's cached M2M + Relevance intelligence, in the
+ * merchant's language. Returns the answer, its language and intent, the facts
+ * it cites, and the approvable action when one applies. Never runs an action.
  */
 export async function POST(request: Request, { params }: { params: Promise<{ merchantId: string }> }) {
   const { merchantId } = await params;
+  if (!validMerchantId(merchantId)) return badRequest("Unknown merchant.");
   const body = await readJson(request);
-  const messages = validChatMessages(body?.messages);
+  const messages = body ? conversationFrom(body) : null;
   if (!messages) return badRequest("The conversation is empty or contains an invalid message.");
 
   try {
-    const result = await answerMerchantQuestion(getIntelligenceDeps(), { merchantId, messages, context: contextFromUrl(new URL(request.url)) });
-    const status = result.status === "answered" ? 200 : result.status === "unavailable" ? 503 : 502;
-    return Response.json(result, { status });
+    return Response.json(await answer(request, merchantId, messages, conversationIdFrom(body?.conversationId), "text"));
   } catch (error) {
     return errorResponse(error);
   }

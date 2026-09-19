@@ -19,7 +19,7 @@ import type {
   PatternType,
   PerformanceBand,
 } from "@/m2m-engine";
-import type { ActionExecutionOutcome, MeasuredOutcome, MerchantBasics, MerchantExplanation } from "@/merchant-intelligence";
+import type { ActionExecutionOutcome, AskResult, MeasuredOutcome, MerchantBasics, MerchantExplanation } from "@/merchant-intelligence";
 import type { DismissalReason, RelevanceSignal, SignalKind } from "@/relevance-engine";
 
 import { formatGrowth, formatRupees, growthTone, shortDate, type LoadState } from "../present";
@@ -457,7 +457,7 @@ export interface MerchantTraceInput {
   explanationLoading: boolean;
   error: string | null;
   /** What the merchant has done in this dialog since it loaded (approval, measured result). */
-  live?: { approval: ActionExecutionOutcome | null; measured: MeasuredOutcome | null };
+  live?: { approval: ActionExecutionOutcome | null; measured: MeasuredOutcome | null; ask?: (AskResult & { question: string }) | null };
   scene?: SceneContext;
 }
 
@@ -883,6 +883,10 @@ export function buildMerchantTrace(input: MerchantTraceInput): TraceModel {
     });
   }
 
+  // Ask Bazaar: the latest conversational answer
+  const ask = input.live?.ask;
+  if (ask) stages.push(askStage(ask));
+
   // Action
   const live = input.live;
   if (recommendation.status === "proposed") {
@@ -944,4 +948,73 @@ export function buildMerchantTrace(input: MerchantTraceInput): TraceModel {
   }
 
   return { scope: "merchant", subject: merchant.name, window: windowOf(m2m.period), unavailable: null, stages };
+}
+
+// --- Ask Bazaar -------------------------------------------------------------------
+
+const ASK_SOURCE: Record<AskResult["source"], string> = {
+  ai: "Model wording, every figure checked",
+  ai_trimmed: "Model wording, unchecked sentences removed",
+  summary: "Built from the facts by rules",
+};
+
+const ASK_ISSUE: Record<NonNullable<AskResult["trace"]["aiIssue"]>, string> = {
+  LLM_NOT_CONFIGURED: "No language model configured",
+  LLM_ERROR: "The language model could not be reached",
+  INVALID_RESPONSE: "The model's reply was not valid",
+  UNSUPPORTED_FIGURE: "The model used a figure not in the facts",
+};
+
+const providerName = (provider: string) => (provider === "sarvam" ? "Sarvam" : provider === "openrouter" ? "OpenRouter" : provider === "rules" ? "Rules" : provider);
+
+function factText(f: AskResult["evidence"][number]): string {
+  if (f.unit === "inr") return rupees(f.value);
+  if (f.unit === "percent") return f.id.endsWith("_share") ? `${f.value.toFixed(1)}%` : pctSigned(f.value);
+  if (f.unit === "points") return points(f.value);
+  return count(f.value);
+}
+
+/** The latest Ask Bazaar turn: which intelligence it used and how the wording was produced and checked. */
+function askStage(ask: AskResult & { question: string }): TraceStage {
+  const t = ask.trace;
+  const wordedBy = ask.source === "summary" ? "Rules (fallback)" : `${providerName(ask.provider)} · ${ask.model}`;
+  return {
+    id: "ask",
+    label: "Ask Bazaar",
+    status: "done",
+    summary:
+      ask.source === "summary"
+        ? "Answered from the structured facts by rules; nothing was made up in place of the model."
+        : `${providerName(ask.provider)} turned ${t.factsSent} structured facts into a ${t.input === "voice" ? "spoken" : "written"} answer.`,
+    rows: [
+      { label: "Question", value: ask.question.length > 80 ? `${ask.question.slice(0, 80)}…` : ask.question },
+      { label: "Asked by", value: t.input === "voice" ? "Voice (Sarvam speech-to-text)" : "Typing" },
+      { label: "Answer language", value: ask.language },
+      { label: "Intent", value: ask.intent.toLowerCase() },
+      { label: "Worded by", value: wordedBy },
+      { label: "Checks", value: ASK_SOURCE[ask.source] },
+      ...(t.aiIssue ? [{ label: "Why", value: ASK_ISSUE[t.aiIssue] }] : []),
+      { label: "Facts sent", value: `${t.factsSent} (from M2M, Relevance and memory)` },
+      { label: "Conversation sent", value: `Last ${t.turnsSent} turn${t.turnsSent === 1 ? "" : "s"}` },
+      { label: "Memory", value: t.memory.status === "recalled" ? `${t.memory.used} past record${t.memory.used === 1 ? "" : "s"}` : t.memory.status === "not_requested" ? "Not used" : "Not available; answered without history" },
+      { label: "Raw transactions sent", value: "None" },
+      { label: "Other shops' identities sent", value: "None" },
+    ],
+    groups: [
+      ...(ask.evidence.length
+        ? [{ title: "Facts the answer cites", rows: ask.evidence.map((f) => ({ label: f.label, value: factText(f) })), note: "Resolved from the fact table on the server, not taken from the model." }]
+        : []),
+      {
+        title: "Intelligence behind it",
+        rows: [
+          ...t.signals.map((s) => ({ label: SIGNAL_WORDS[s.kind as SignalKind] ?? s.kind, value: `${s.priority} priority · ${s.direction} · ${Math.abs(s.magnitudePp).toFixed(1)} pts` })),
+          ...t.patterns.map((p) => ({ label: "Pattern", value: PATTERN_WORDS[p as PatternType] ?? p })),
+          ...(t.opportunity ? [{ label: "Opportunity", value: t.opportunity }] : []),
+        ],
+      },
+      ...(ask.action
+        ? [{ title: "Action offered", rows: [{ label: "Proposal", value: ask.action.description }, { label: "Needs approval", value: "Yes" }], note: "The same deterministic proposal as the offer card. The model can point to it but cannot create or run it." }]
+        : []),
+    ],
+  };
 }

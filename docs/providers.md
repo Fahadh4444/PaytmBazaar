@@ -12,8 +12,8 @@ on the boundary. Provider details do not leak past it.
 | Provider | Role | Status |
 | --- | --- | --- |
 | Supabase | PostgreSQL, structured facts | Schema + clients implemented; read through the [Data Adapter](data-adapter.md) |
-| OpenRouter | LLM provider | Implemented |
-| Sarvam | Possible future LLM / voice / multilingual | **Not integrated** — no confirmed access |
+| Sarvam | Ask Bazaar chat (Sarvam 105B), voice input (Saaras STT), spoken answers (Bulbul TTS) | Implemented (`lib/llm/sarvam.ts`, `lib/speech/`); default LLM, needs `SARVAM_API_KEY` — see [ask-bazaar.md](ask-bazaar.md) |
+| OpenRouter | LLM provider | Implemented; fallback when Sarvam is unconfigured or fails |
 | Cognee | Contextual memory | Implemented (`MemoryProvider` over the REST API); needs credentials — see [intelligence-pipeline.md](intelligence-pipeline.md) |
 | n8n | Action orchestration | Implemented (`ActionExecutor` via one webhook workflow); needs an n8n instance |
 | Paytm | Intended data source | **No authorized access** — synthetic data in Supabase behind `PaytmDataSource` |
@@ -29,16 +29,26 @@ product code  →  lib/llm  →  provider
 ```
 
 `lib/llm/types.ts` defines `LlmProvider`, `LlmRequest`, `LlmResponse` and
-`LlmError`. `lib/llm/openrouter.ts` is the only file that knows OpenRouter's
-wire format. `lib/llm/index.ts` picks a provider from `LLM_PROVIDER` (default
-`openrouter`).
+`LlmError`. `lib/llm/sarvam.ts` and `lib/llm/openrouter.ts` are the only files
+that know each provider's wire format. `lib/llm/index.ts` picks the primary from
+`LLM_PROVIDER` (default `sarvam`) and wraps it with `LLM_FALLBACK_PROVIDER`
+(default `openrouter`). `LlmResponse.provider` / `model` report who actually
+answered.
 
-Adding Sarvam later means: write `lib/llm/sarvam.ts` implementing
-`LlmProvider`, add one entry to the map in `index.ts`. The M2M engine, the API
-routes and the UI do not change. That is the entire reason this boundary exists.
+Sarvam was added exactly as this boundary intended: one provider file and one
+map entry. The M2M engine, the API routes and the insight code did not change.
+The endpoints follow Sarvam's published API reference (docs.sarvam.ai).
 
-Sarvam is not implemented and will not be until real access and documentation
-exist. Guessed endpoints are worse than a missing feature.
+## Speech boundary
+
+```
+Ask Bazaar voice  →  lib/speech  →  Sarvam (Saaras STT, Bulbul TTS)
+```
+
+`lib/speech/types.ts` defines `SpeechProvider` (`transcribe`, `synthesize`),
+the supported Indian languages and `SpeechError`. `lib/speech/sarvam.ts` is
+the only file that knows Sarvam's speech formats. Both Sarvam files share
+`lib/sarvam/client.ts`, the one place that reads `SARVAM_API_KEY`.
 
 ## Cognee
 
@@ -87,8 +97,9 @@ Optional dependencies must not become hard dependencies.
   thinner, not absent.
 - **OpenRouter fails** → the LLM-dependent operation returns a clear
   `LlmError`. Unrelated parts of the product keep working.
-- **Sarvam available later and failing** → fall back to OpenRouter where
-  configured and appropriate.
+- **Sarvam failing or unconfigured** → chat falls back to OpenRouter; if that
+  also fails, Ask Bazaar answers from the fact table by rules. Voice reports it is
+  unavailable and the merchant types instead; a failed spoken answer leaves the text.
 - **n8n unavailable** → the insight and recommendation still exist and are still
   shown. Only action execution fails, and it reports that it failed.
 - **Supabase unconfigured** → clients throw a descriptive error at the call

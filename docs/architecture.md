@@ -198,10 +198,15 @@ is not responsible for calculating core metrics or detecting the underlying
 statistical pattern.
 
 ```
-LlmProvider
-  ├── OpenRouter            (implemented)
-  └── Sarvam                (future / optional — not available today)
+LlmProvider (lib/llm, primary + fallback)
+  ├── Sarvam 105B           (implemented, default)
+  └── OpenRouter            (implemented, fallback)
+
+SpeechProvider (lib/speech)
+  └── Sarvam                (Saaras STT, Bulbul TTS)
 ```
+
+Ask Bazaar, the merchant conversation, is described in [ask-bazaar.md](ask-bazaar.md).
 
 ### n8n — action / orchestration layer
 

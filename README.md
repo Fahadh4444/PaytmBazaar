@@ -53,7 +53,8 @@ m2m-engine/   Deterministic merchant-to-merchant intelligence (no dependencies)
 data/         Synthetic demo data
 lib/paytm/    Data Adapter — the only reader of merchant data
 lib/supabase/ Application-side database access
-lib/llm/      LLM provider boundary (OpenRouter today, Sarvam possible later)
+lib/llm/      LLM provider boundary (Sarvam 105B, OpenRouter fallback)
+lib/speech/   Voice boundary (Sarvam speech-to-text and text-to-speech)
 lib/cognee/   Contextual memory boundary
 lib/n8n/      Action / workflow boundary
 supabase/     Database schema and migrations
@@ -92,5 +93,6 @@ it through an API route and showing it in the Merchant Dialog.
 - [M2M engine](docs/m2m-engine.md) — pipeline, metrics, cohorts, patterns, output contract (implemented)
 - [Relevance Engine](docs/relevance-engine.md) — which M2M findings matter to a merchant now, and why (implemented)
 - [Intelligence pipeline](docs/intelligence-pipeline.md) — end to end: M2M → Relevance → Cognee → LLM → approval → n8n → outcome (implemented)
+- [Ask Bazaar](docs/ask-bazaar.md) — the merchant conversation: Sarvam chat, voice and languages, privacy, approval and memory boundaries
 - [Provider strategy](docs/providers.md) — external integrations and failure handling
 - [Local development](docs/development.md) — setup, scripts, branching, parallel work

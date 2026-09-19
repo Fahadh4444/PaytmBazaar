@@ -144,7 +144,10 @@ supporting each opportunity.
 
 ## Merchant — private intelligence (right side)
 
-### `POST /api/merchant/{id}/ask` — Proposed
+### `POST /api/merchant/{id}/ask` — Implemented as `POST /api/merchants/{id}/chat`
+
+Implemented, with `/chat/voice` (spoken questions) and `/chat/speech` (Listen).
+See [ask-bazaar.md](ask-bazaar.md) and [intelligence-pipeline.md](intelligence-pipeline.md#api).
 
 Ask Bazaar. The merchant asks a natural-language question, e.g. "Why are my
 sales falling?", "What are similar businesses seeing?", "Have we seen this

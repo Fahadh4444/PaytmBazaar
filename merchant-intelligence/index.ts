@@ -23,4 +23,5 @@ export {
 } from "./actions";
 export { buildFacts } from "./facts";
 export { getBazaarIntelligence, getCityIntelligence, loadNetwork, primaryCity, type NetworkSnapshot } from "./area";
+export { askBazaar, type AskAction, type AskIntent, type AskResult, type AskTrace } from "./chat";
 export { buildInsightPrompt, capConfidence, generateInsight, insightSchema, parseInsight, unsupportedFigures } from "./insight";

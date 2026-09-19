@@ -16,11 +16,12 @@ import { getMerchantActionStore, getPaytmDataSource } from "@/lib/paytm";
 
 import { getBazaarIntelligence, getCityIntelligence, loadNetwork, type NetworkSnapshot } from "./area";
 import { cached, invalidateMerchant } from "./cache";
+import { recallHistory } from "./memory";
 import { withRetry } from "./retry";
 import { explainMerchant, getMerchantBasics } from "./service";
 import type { AreaIntelligence, SelectedContext } from "@/m2m-engine";
 
-import type { IntelligenceDeps, MerchantBasics, MerchantExplanation } from "./types";
+import type { HistoryResult, IntelligenceDeps, MerchantBasics, MerchantExplanation } from "./types";
 
 const BASICS_TTL_MS = 10 * 60_000;
 const EXPLANATION_TTL_MS = 30 * 60_000;
@@ -63,6 +64,29 @@ export async function getCachedExplanation(deps: IntelligenceDeps, merchantId: s
     // Keep only AI-written summaries; a fallback is retried on the next open.
     (result) => result.insight.status === "generated" && result.insight.source === "ai",
   );
+}
+
+const HISTORY_TTL_MS = 10 * 60_000;
+/** Ask Bazaar answers without history rather than wait on a slow memory service. */
+const CHAT_RECALL_TIMEOUT_MS = 4_000;
+
+/**
+ * Remembered history for Ask Bazaar, recalled once per merchant and period
+ * and reused by every follow-up. The recall keeps running in the background
+ * when it is slow, so a later question picks up its result; the answer in
+ * hand never waits longer than the timeout. A failure is not cached.
+ */
+export function getCachedHistory(deps: IntelligenceDeps, basics: MerchantBasics): Promise<HistoryResult> {
+  const recall = cached(
+    `history:${basics.merchant.mid}:${basics.period.current.to}`,
+    HISTORY_TTL_MS,
+    () => recallHistory(deps.memory, basics.relevance),
+    (result) => result.status === "recalled",
+  );
+  return Promise.race<HistoryResult>([
+    recall,
+    new Promise((resolve) => setTimeout(() => resolve({ status: "failed", reason: "MEMORY_ERROR" }), CHAT_RECALL_TIMEOUT_MS)),
+  ]);
 }
 
 const NETWORK_TTL_MS = 10 * 60_000;

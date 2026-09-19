@@ -213,7 +213,9 @@ The outcome is written in two places:
 | GET | `/api/merchants/:merchantId/intelligence` | merchant profile, period, `m2m`, `relevance`, `history`, `insight`, `recommendation`, `services` |
 | POST | `/api/merchants/:merchantId/actions` | `{ action, execution, pendingReason, memory }`. 200 executed · 502 failed · 202 pending |
 | POST | `/api/merchants/:merchantId/actions/:actionId/outcome` | `measured` or `pending_data` |
-| POST | `/api/merchants/:merchantId/chat` | an answer grounded in the same fact table; replies with unsupported figures are withheld |
+| POST | `/api/merchants/:merchantId/chat` | Ask Bazaar: `{ message, history?, conversationId? }` → `AskResult` (answer, language, intent, cited facts, recommendation, approvable action, trace); unsupported figures are corrected, removed or replaced |
+| POST | `/api/merchants/:merchantId/chat/voice` | multipart `audio` → Sarvam STT → the same answer, plus `transcript` and spoken `audio` (base64 MP3). 502 `voice_failed`, 503 `voice_unavailable` |
+| POST | `/api/merchants/:merchantId/chat/speech` | `{ text, language }` → Sarvam TTS `{ audio }` for the Listen button |
 | GET | `/api/bazaars/:bazaarId/merchants` | public profiles (ID, name, category) for the UI |
 
 Errors are `{ error: { code, message } }` and never include causes or

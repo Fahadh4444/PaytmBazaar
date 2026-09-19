@@ -140,7 +140,22 @@ export function buildInsightPrompt(input: {
 
 const ISO_DATE = /\b\d{4}-\d{2}-\d{2}\b/g;
 /** An offer amount the model suggests ("10% cashback", "₹20 off") is advice, not a reported figure. */
-const OFFER_AFTER = /^\s*(?:%\s*)?(?:instant\s+)?(?:cashback|off\b|discount)/i;
+const OFFER_AFTER = /^\s*(?:%\s*)?(?:instant\s+)?(?:cashback|off\b|discount|कैशबैक|छूट|डिस्काउंट)/i;
+/** Zero of each Indian script's own digits; answers in Indian languages may use them. */
+const DIGIT_ZEROS = [0x0966, 0x09e6, 0x0a66, 0x0ae6, 0x0b66, 0x0be6, 0x0c66, 0x0ce6, 0x0d66];
+/** "percent" in Indian languages, so "29.5 प्रतिशत" is checked like "29.5%". */
+const PERCENT_WORDS = /\s*(?:प्रतिशत|फ़ीसदी|फीसदी|फीसद|टक्के|टक्का|শতাংশ|சதவீதம்|சதவிகிதம்|శాతం|ಶೇಕಡಾ|ശതമാനം|ટકા|ਪ੍ਰਤੀਸ਼ਤ|ପ୍ରତିଶତ)/g;
+
+/** Rewrites Indian-script digits and percent words to ASCII so every language gets the same check. */
+export function normalizeFigures(text: string): string {
+  let out = "";
+  for (const ch of text) {
+    const code = ch.codePointAt(0)!;
+    const zero = DIGIT_ZEROS.find((z) => code >= z && code <= z + 9);
+    out += zero === undefined ? ch : String(code - zero);
+  }
+  return out.replace(PERCENT_WORDS, "%");
+}
 /** ...and so is an offer threshold ("on orders above ₹250"). */
 const OFFER_BEFORE = /(?:above|over|at least|minimum|min\.?|worth|upto|up to)\s*$/i;
 const NUMBER = /(₹|rs\.?|inr)?\s*(-?\d[\d,]*(?:\.\d+)?)\s*(%|pp\b|percentage points?|points?|k\b|lakh|crore)?/gi;
@@ -158,7 +173,7 @@ function allowedValues(facts: Fact[]): number[] {
 export function unsupportedFigures(text: string, facts: Fact[]): string[] {
   const allowed = allowedValues(facts);
   const bad: string[] = [];
-  const clean = text.replace(ISO_DATE, " ");
+  const clean = normalizeFigures(text).replace(ISO_DATE, " ");
   for (const match of clean.matchAll(NUMBER)) {
     const [raw, currency, digits, unit] = match;
     if (OFFER_AFTER.test(clean.slice((match.index ?? 0) + raw.length))) continue;
@@ -192,7 +207,7 @@ function insightTexts(insight: MerchantInsight): string[] {
   ];
 }
 
-function stripFence(text: string): string {
+export function stripFence(text: string): string {
   const fenced = text.trim().match(/^```(?:json)?\s*([\s\S]*?)\s*```$/i);
   return fenced ? fenced[1] : text.trim();
 }
@@ -263,6 +278,7 @@ export async function generateInsight(
 
   let text: string;
   let provider: string;
+  let answeredBy: string;
   try {
     // One retry for a network blip or timeout.
     let response = await ask().catch(() => ask());
@@ -282,6 +298,7 @@ export async function generateInsight(
     }
     text = response.text;
     provider = response.provider;
+    answeredBy = response.model ?? model;
   } catch {
     return rules("LLM_ERROR");
   }
@@ -289,7 +306,7 @@ export async function generateInsight(
   try {
     const insight = parseInsight(text, input.facts);
     insight.recommendation.confidence = capConfidence(insight.recommendation.confidence, input.relevance.cohortConfidence);
-    return { status: "generated", source: "ai", provider, model, insight, facts: input.facts };
+    return { status: "generated", source: "ai", provider, model: answeredBy, insight, facts: input.facts };
   } catch (error) {
     if (error instanceof InsightValidationError) return rules(error.reason);
     throw error;

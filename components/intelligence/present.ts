@@ -183,6 +183,40 @@ const FOLLOW_UPS = [
   "What is my strongest day?",
 ];
 
+const DAY_NAMES: Record<string, string> = {
+  monday: "Mondays", tuesday: "Tuesdays", wednesday: "Wednesdays", thursday: "Thursdays",
+  friday: "Fridays", saturday: "Saturdays", sunday: "Sundays",
+};
+
+/**
+ * Ask Bazaar's opening questions, chosen from what Relevance ranked for this
+ * merchant. Only the questions are prepared here; every answer comes from
+ * the merchant's intelligence at the time it is asked.
+ */
+export function starterQuestions(basics: MerchantBasics | null): string[] {
+  if (!basics) return ["Why are my sales changing?", "What should I focus on?", "What is different about my Bazaar?"];
+  const { relevance } = basics;
+  const questions: string[] = [];
+  const growth = basics.m2m.merchantMetrics.current.growth;
+  if (growth != null) questions.push(growth < 0 ? "Why are my sales down?" : "Why are my sales up?");
+
+  const context = relevance.prioritySignals.find((s) => s.kind === "CONTEXT" && s.evidence.context)?.evidence.context;
+  if (context?.dimension === "timeOfDay") questions.push(`What is happening with my ${context.segment} sales?`);
+  else if (context?.dimension === "dayOfWeek" && DAY_NAMES[context.segment]) questions.push(`What is happening on ${DAY_NAMES[context.segment]}?`);
+
+  const patterns = relevance.relevantPatterns.map((p) => p.type);
+  if (patterns.includes("MERCHANT_DOWN_BAZAAR_UP") || patterns.includes("MERCHANT_UP_BAZAAR_DOWN") || relevance.prioritySignals[0]?.kind === "BAZAAR_GAP") {
+    questions.push("Why is my business moving differently from the Bazaar?");
+  } else if (relevance.prioritySignals.some((s) => s.kind === "COHORT_GAP")) {
+    questions.push("How do I compare with similar shops?");
+  } else {
+    questions.push("What is different about my Bazaar?");
+  }
+  if (relevance.relevantOpportunities.length > 0) questions.push("Show me my biggest opportunity.");
+  questions.push("What should I focus on?");
+  return [...new Set(questions)].slice(0, 4);
+}
+
 /** Up to three follow-up questions not asked yet in this conversation. */
 export function followUpQuestions(asked: string[], hasOffer: boolean): string[] {
   const seen = new Set(asked.map((q) => q.trim().toLowerCase()));

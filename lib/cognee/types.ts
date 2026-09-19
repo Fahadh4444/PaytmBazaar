@@ -10,7 +10,8 @@
  * for that merchant.
  */
 
-export type MemoryKind = "insight" | "action_outcome" | "measured_outcome";
+/** `conversation`: a merchant question in Ask Bazaar that led to a recommendation. */
+export type MemoryKind = "insight" | "action_outcome" | "measured_outcome" | "conversation";
 
 /** A compact description of a situation: the leading relevance signals. */
 export interface MemorySignal {
@@ -36,6 +37,8 @@ export interface MerchantMemory {
     contextStatus?: string;
   };
   recommendation?: { action: string; expectedOutcome: string };
+  /** The merchant's own question (conversation memories only), with contact-like details removed. */
+  question?: string;
   action?: { actionId: string; type: string; parameters: Record<string, unknown>; status: string };
   outcome?: {
     status: string;

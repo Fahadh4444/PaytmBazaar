@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState, type FormEvent } from "react";
+import { useCallback, useEffect, useRef, useState, type FormEvent } from "react";
 
 import SceneDialog from "@/components/bazaar/SceneDialog";
 import { contextQuery, intelligenceContext, type CityContext } from "@/components/city/context";
@@ -8,10 +8,13 @@ import { shops, type Shop } from "@/data/shops";
 import { GrowthBars } from "@/components/intelligence/Charts";
 import ist from "@/components/intelligence/intelligence.module.css";
 import DialogTools from "@/components/intelligence/inspect/DialogTools";
-import { describeTopSignal, followUpQuestions, formatGrowth, merchantForBuilding } from "@/components/intelligence/present";
+import { describeTopSignal, followUpQuestions, formatGrowth, merchantForBuilding, starterQuestions } from "@/components/intelligence/present";
 import RichText, { inline } from "@/components/intelligence/RichText";
+import { LANGUAGE_NAMES, type LanguageCode } from "@/lib/speech/types";
 import type {
   ActionExecutionOutcome,
+  AskAction,
+  AskResult,
   MeasuredOutcome,
   MeasuredOutcomeResult,
   MerchantBasics,
@@ -20,6 +23,7 @@ import type {
 import type { SelectedContextEvidence } from "@/m2m-engine";
 
 import styles from "./bazaar-screen.module.css";
+import { useVoiceRecorder } from "./useVoiceRecorder";
 
 type MerchantDialogProps = {
   shop: Shop | null;
@@ -30,7 +34,46 @@ type MerchantDialogProps = {
   context: CityContext;
 };
 
-type ChatMessage = { role: "user" | "assistant"; content: string };
+type ChatMessage = {
+  role: "user" | "assistant";
+  content: string;
+  /** Assistant turns: what Ask Bazaar returned alongside the text. */
+  language?: LanguageCode;
+  action?: AskAction | null;
+  evidence?: AskResult["evidence"];
+  provider?: string;
+  model?: string;
+  /** User turns: asked by voice (the text is the transcript). */
+  voice?: boolean;
+  /** Spoken answer, once fetched. */
+  audio?: string;
+};
+
+type VoiceReply = AskResult & {
+  conversationId: string;
+  transcript: string;
+  audio: { base64: string; mimeType: string } | null;
+  audioError: string | null;
+};
+
+const newConversationId = () =>
+  typeof crypto !== "undefined" && "randomUUID" in crypto ? crypto.randomUUID() : `c-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
+
+/** Only the text of earlier turns goes back to the server, never the extras. */
+const turns = (messages: ChatMessage[]) => messages.slice(-7).map(({ role, content }) => ({ role, content }));
+
+const factValue = (fact: AskResult["evidence"][number]) =>
+  fact.unit === "inr"
+    ? `₹${fact.value.toLocaleString("en-IN")}`
+    : fact.unit === "percent"
+      ? fact.id.endsWith("_share") ? `${fact.value}%` : `${fact.value > 0 ? "+" : ""}${fact.value}%`
+      : fact.unit === "points"
+        ? `${fact.value > 0 ? "+" : ""}${fact.value} pts`
+        : fact.value.toLocaleString("en-IN");
+
+const providerLabel = (provider?: string, model?: string) =>
+  !provider ? null : provider === "rules" ? "Summary mode" : provider === "sarvam" ? `Sarvam · ${model ?? "105B"}` : model ?? provider;
+
 type BazaarMerchant = { mid: string; name: string; category: string };
 
 const rupees = new Intl.NumberFormat("en-IN", {
@@ -86,6 +129,12 @@ export default function MerchantDialog({
   const [draft, setDraft] = useState("");
   const [chatLoading, setChatLoading] = useState(false);
   const [chatError, setChatError] = useState<string | null>(null);
+  const [chatPhase, setChatPhase] = useState<"text" | "voice">("text");
+  const [conversationId, setConversationId] = useState(newConversationId);
+  const [lastAsk, setLastAsk] = useState<(AskResult & { question: string }) | null>(null);
+  const [confirming, setConfirming] = useState<AskAction | null>(null);
+  const [speaking, setSpeaking] = useState<{ index: number; state: "loading" | "playing" } | null>(null);
+  const player = useRef<HTMLAudioElement | null>(null);
   const [actionState, setActionState] = useState<"idle" | "running" | "done">("idle");
   const [actionResult, setActionResult] = useState<string | null>(null);
   const [measured, setMeasured] = useState<MeasuredOutcome | null>(null);
@@ -114,6 +163,12 @@ export default function MerchantDialog({
       setExplanation(null);
       setActionState("idle");
       setActionResult(null);
+      // A conversation belongs to one merchant: start fresh for each shop.
+      setMessages([]);
+      setLastAsk(null);
+      setConfirming(null);
+      setChatError(null);
+      setConversationId(newConversationId());
       // Every Bazaar shares one street render: building N opens the Bazaar's Nth merchant.
       const merchants = await bazaarMerchants(bazaarId);
       if (merchants.length === 0) throw new Error("This Bazaar has no shops yet.");
@@ -157,27 +212,48 @@ export default function MerchantDialog({
     event.preventDefault();
     await sendQuestion(draft.trim());
   };
+
+  /** Adds Ask Bazaar's answer to the conversation, keeping what came with it. */
+  const addAnswer = (question: string, result: AskResult, audio?: string) => {
+    setMessages((current) => [
+      ...current,
+      {
+        role: "assistant",
+        content: result.answer,
+        language: result.language,
+        action: result.action,
+        evidence: result.evidence,
+        provider: result.provider,
+        model: result.model,
+        audio,
+      },
+    ]);
+    setLastAsk({ ...result, question });
+  };
+
   const sendQuestion = async (question: string) => {
     if (!mid || !question || chatLoading) return;
 
-    const nextMessages: ChatMessage[] = [...messages, { role: "user", content: question }];
-    setMessages(nextMessages);
+    const history = turns(messages);
+    setMessages((current) => [...current, { role: "user", content: question }]);
     setDraft("");
     setChatError(null);
+    setConfirming(null);
+    setChatPhase("text");
     setChatLoading(true);
 
     try {
       const response = await fetch(`/api/merchants/${encodeURIComponent(mid)}/chat`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        // Recent turns are enough context, and keep the request small.
-        body: JSON.stringify({ messages: nextMessages.slice(-8) }),
+        // A bounded conversation: recent turns only, text only.
+        body: JSON.stringify({ message: question, history, conversationId }),
       });
       const body = await response.json();
       if (!response.ok || body.status !== "answered") {
         throw new Error(body?.error?.message ?? "Couldn't reach Bazaar just now. Please send your question again.");
       }
-      setMessages((current) => [...current, { role: "assistant", content: body.message }]);
+      addAnswer(question, body as AskResult);
     } catch (error) {
       setChatError(error instanceof Error ? error.message : "Couldn't reach Bazaar just now. Please send your question again.");
     } finally {
@@ -185,16 +261,102 @@ export default function MerchantDialog({
     }
   };
 
+  const stopAudio = () => {
+    player.current?.pause();
+    player.current = null;
+    setSpeaking(null);
+  };
+
+  const playAudio = (index: number, source: string) => {
+    stopAudio();
+    const audio = new Audio(source);
+    player.current = audio;
+    audio.onended = () => setSpeaking((current) => (current?.index === index ? null : current));
+    setSpeaking({ index, state: "playing" });
+    return audio.play().catch(() => {
+      // Autoplay can be blocked; the Listen button still works.
+      setSpeaking(null);
+    });
+  };
+
+  const listen = async (index: number) => {
+    const message = messages[index];
+    if (!mid || !message || message.role !== "assistant") return;
+    if (speaking?.index === index) return stopAudio();
+    if (message.audio) return void playAudio(index, message.audio);
+    stopAudio();
+    setSpeaking({ index, state: "loading" });
+    try {
+      const response = await fetch(`/api/merchants/${encodeURIComponent(mid)}/chat/speech`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ text: message.content, language: message.language ?? "en-IN" }),
+      });
+      if (!response.ok) throw new Error(await readError(response, "Listening isn't available right now."));
+      const { audio } = (await response.json()) as { audio: { base64: string; mimeType: string } };
+      const source = `data:${audio.mimeType};base64,${audio.base64}`;
+      setMessages((current) => current.map((m, i) => (i === index ? { ...m, audio: source } : m)));
+      await playAudio(index, source);
+    } catch (error) {
+      setSpeaking(null);
+      setChatError(error instanceof Error ? error.message : "Listening isn't available right now.");
+    }
+  };
+
+  const sendVoice = useCallback(
+    async (audio: Blob, filename: string) => {
+      if (!mid) return;
+      setChatError(null);
+      setConfirming(null);
+      setChatPhase("voice");
+      setChatLoading(true);
+      const form = new FormData();
+      form.append("audio", audio, filename);
+      form.append("history", JSON.stringify(turns(messages)));
+      form.append("conversationId", conversationId);
+      try {
+        const response = await fetch(`/api/merchants/${encodeURIComponent(mid)}/chat/voice`, { method: "POST", body: form });
+        const body = await response.json();
+        if (!response.ok || body.status !== "answered") {
+          throw new Error(body?.error?.message ?? "Voice input couldn't be processed. You can type your question instead.");
+        }
+        const reply = body as VoiceReply;
+        const source = reply.audio ? `data:${reply.audio.mimeType};base64,${reply.audio.base64}` : undefined;
+        setMessages((current) => [...current, { role: "user", content: reply.transcript, voice: true }]);
+        addAnswer(reply.transcript, reply, source);
+        if (reply.audioError) setChatError(reply.audioError);
+        // Asked by voice, answered by voice: the index is where the answer just landed.
+        if (source) void playAudio(messages.length + 1, source);
+      } catch (error) {
+        setChatError(error instanceof Error ? error.message : "Voice input couldn't be processed. You can type your question instead.");
+      } finally {
+        setChatLoading(false);
+      }
+    },
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [mid, messages, conversationId],
+  );
+  const recorder = useVoiceRecorder(sendVoice);
+
+  // Closing the dialog stops any answer being read aloud.
+  useEffect(() => {
+    if (!open) {
+      player.current?.pause();
+      player.current = null;
+    }
+  }, [open]);
+
   const recommendation = basics?.recommendation;
-  const approveAction = async () => {
-    if (!mid || recommendation?.status !== "proposed" || !recommendation.actionId) return;
+  /** Runs the saved proposal, only after the merchant's explicit approval. */
+  const approveAction = async (actionId = recommendation?.status === "proposed" ? recommendation.actionId : null) => {
+    if (!mid || !actionId) return;
     setActionState("running");
     setActionResult(null);
     try {
       const response = await fetch(`/api/merchants/${encodeURIComponent(mid)}/actions`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ actionId: recommendation.actionId, approved: true }),
+        body: JSON.stringify({ actionId, approved: true }),
       });
       if (!response.ok && response.status !== 502) throw new Error(await readError(response, "The offer could not be started."));
       const outcome = (await response.json()) as ActionExecutionOutcome;
@@ -204,7 +366,7 @@ export default function MerchantDialog({
         outcome.execution?.status === "executed"
           ? "Done! Your offer is live."
           : outcome.execution?.status === "failed"
-            ? "Sorry, the offer could not be started. Please try again."
+            ? "Sorry, the offer could not be started. Your recommendation is saved; please try again."
             : "Approved. It will start once the offer service is connected.",
       );
       if (started) setActionState("done");
@@ -298,8 +460,9 @@ export default function MerchantDialog({
     if (forecast.direction === "increase") return "Email opted-in customers before this window to capture the stronger expected demand.";
     return "No context-specific promotion is indicated; keep the normal merchant plan and monitor the result.";
   })();
-  const lastQuestion = [...messages].reverse().find((message) => message.role === "user")?.content ?? "";
-  const asksForAction = /what (?:can|should) i do|increase|grow|improve|offer|recommend|notify|campaign/i.test(lastQuestion);
+  const latest = messages.at(-1);
+  const chatAction = !chatLoading && latest?.role === "assistant" && !running && actionState !== "done" ? latest.action ?? null : null;
+  const badge = providerLabel(lastAsk?.provider, lastAsk?.model) ?? providerLabel(basics?.services.llm.provider, basics?.services.llm.model);
 
   const notifyFromSimulation = async () => {
     if (!mid || !simulationContext || simulationActionState === "running") return;
@@ -348,7 +511,7 @@ export default function MerchantDialog({
               basicsLoading: analysisLoading,
               explanationLoading: summaryLoading,
               error: analysisError,
-              live: { approval, measured },
+              live: { approval, measured, ask: lastAsk },
             }}
           />
         ) : null
@@ -507,10 +670,11 @@ export default function MerchantDialog({
         <section className={styles.chatPanel} aria-labelledby="merchant-view-heading">
           <div className={styles.chatHeading}>
             <div>
-              <p className={styles.sectionKicker}>AI-guided view</p>
-              <h3 id="merchant-view-heading" className={styles.workspaceHeading}>What Merchant Sees</h3>
+              <p className={styles.sectionKicker}>What the merchant sees</p>
+              <h3 id="merchant-view-heading" className={styles.workspaceHeading}>Ask Bazaar</h3>
+              <p className={styles.askTagline}>Your business, understood.</p>
             </div>
-            <span className={styles.liveBadge}><i /> {basics?.services.llm.model ?? "AI"}</span>
+            {badge && <span className={styles.liveBadge} title="Who is answering"><i /> {badge}</span>}
           </div>
 
           {/* Pinned above the chat so the suggested offer is always in view. */}
@@ -540,7 +704,7 @@ export default function MerchantDialog({
                 </>
               ) : recommendation.actionId && actionState !== "done" ? (
                 <p>
-                  <button type="button" className={styles.offerButton} onClick={approveAction} disabled={actionState === "running"}>
+                  <button type="button" className={styles.offerButton} onClick={() => approveAction()} disabled={actionState === "running"}>
                     {actionState === "running" ? "Starting…" : "Yes, start this offer"}
                   </button>
                 </p>
@@ -581,10 +745,10 @@ export default function MerchantDialog({
               <div className={styles.chatWelcome}>
                 <span className={styles.spark}>✦</span>
                 <strong>Ask about your business</strong>
-                <p>Ask anything about your sales, in your own words.</p>
+                <p>Type or speak in English, Hindi, Kannada, Tamil or any Indian language.</p>
                 <div className={styles.suggestions}>
-                  {["How are my sales doing?", "What should I do this week?", "Am I doing better than shops nearby?"].map((suggestion) => (
-                    <button key={suggestion} type="button" onClick={() => setDraft(suggestion)} disabled={!mid}>
+                  {starterQuestions(basics).map((suggestion) => (
+                    <button key={suggestion} type="button" onClick={() => ask(suggestion)} disabled={!mid || chatLoading}>
                       {suggestion}
                     </button>
                   ))}
@@ -592,50 +756,141 @@ export default function MerchantDialog({
               </div>
             )}
 
-            {messages.map((message, index) => (
-              <div key={`${message.role}-${index}`} className={message.role === "user" ? styles.userMessage : styles.assistantMessage}>
-                {message.role === "assistant" ? <RichText text={message.content} /> : message.content}
-              </div>
-            ))}
-            {!chatLoading && messages.at(-1)?.role === "assistant" && (
-              <>
-                {asksForAction && recommendation?.status === "proposed" && recommendation.actionId && !running && (
-                  <div className={styles.chatAction}>
-                    <span>Act on this answer</span>
-                    <button type="button" className={styles.offerButton} onClick={approveAction} disabled={actionState === "running"}>
-                      {actionState === "running" ? "Sending…" : "Approve and email customers"}
+            {messages.map((message, index) =>
+              message.role === "user" ? (
+                <div key={`user-${index}`} className={styles.userMessage}>
+                  {message.voice && <span className={styles.voiceTag} aria-label="Asked by voice">🎙 </span>}
+                  {message.content}
+                </div>
+              ) : (
+                <div key={`assistant-${index}`} className={`${styles.assistantMessage} ${styles.askAnswer}`}>
+                  <RichText text={message.content} />
+                  {message.evidence && message.evidence.length > 0 && (
+                    <ul className={styles.evidenceList} aria-label="Based on">
+                      {message.evidence.slice(0, 3).map((fact) => (
+                        <li key={fact.id}>
+                          <span>{fact.label.replace(/ \((?:%|₹)\)$/, "")}</span>
+                          <strong>{factValue(fact)}</strong>
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                  <div className={styles.answerTools}>
+                    <button
+                      type="button"
+                      className={styles.listenButton}
+                      onClick={() => listen(index)}
+                      aria-pressed={speaking?.index === index}
+                      disabled={speaking?.index === index && speaking.state === "loading"}
+                    >
+                      {speaking?.index === index ? (speaking.state === "loading" ? "Preparing…" : "■ Stop") : "🔊 Listen"}
                     </button>
-                    <small>The assistant text is never executed. n8n receives the validated merchant action only.</small>
+                    {message.language && message.language !== "en-IN" && <span>{LANGUAGE_NAMES[message.language]}</span>}
+                    {message.provider === "rules" && <span>From your numbers</span>}
+                  </div>
+                </div>
+              ),
+            )}
+            {!chatLoading && latest?.role === "assistant" && (
+              <>
+                {chatAction && !confirming && (
+                  <div className={styles.chatAction}>
+                    <span>Bazaar recommends</span>
+                    <strong>{chatAction.description}</strong>
+                    <button type="button" className={styles.offerButton} onClick={() => setConfirming(chatAction)}>
+                      Take action
+                    </button>
                   </div>
                 )}
+                {confirming && (
+                  <div className={styles.confirmCard} role="alertdialog" aria-labelledby="confirm-title">
+                    <span id="confirm-title">Confirm this action</span>
+                    <strong>{confirming.description}</strong>
+                    <p>
+                      It starts only when you approve. Paytm Bazaar sends this exact offer to its action workflow, then measures
+                      the result against similar shops.
+                    </p>
+                    <div className={styles.confirmButtons}>
+                      <button type="button" className={styles.cancelButton} onClick={() => setConfirming(null)} disabled={actionState === "running"}>
+                        Cancel
+                      </button>
+                      <button
+                        type="button"
+                        className={styles.offerButton}
+                        disabled={actionState === "running"}
+                        onClick={async () => {
+                          await approveAction(confirming.actionId);
+                          setConfirming(null);
+                        }}
+                      >
+                        {actionState === "running" ? "Starting…" : "Approve"}
+                      </button>
+                    </div>
+                  </div>
+                )}
+                {actionResult && lastAsk?.action && <p className={styles.actionNote}>{actionResult}</p>}
                 <div className={styles.suggestions}>
-                  {followUpQuestions(messages.map((m) => m.content), recommendation?.status === "proposed" && !running).map((q) => (
+                  {followUpQuestions(messages.filter((m) => m.role === "user").map((m) => m.content), recommendation?.status === "proposed" && !running).map((q) => (
                     <button key={q} type="button" onClick={() => ask(q)}>{q}</button>
                   ))}
                 </div>
               </>
             )}
-            {chatLoading && <div className={styles.assistantMessage}>Looking at your sales…</div>}
+            {chatLoading && (
+              <div className={`${styles.assistantMessage} ${styles.thinking}`} role="status">
+                <i /><i /><i />
+                <span>{chatPhase === "voice" ? "Understanding your question…" : "Looking at your Bazaar…"}</span>
+              </div>
+            )}
           </div>
 
-          {chatError && <p className={styles.chatError}>{chatError}</p>}
+          {(chatError || recorder.error) && <p className={styles.chatError}>{recorder.error ?? chatError}</p>}
 
-          <form className={styles.chatComposer} onSubmit={sendMessage}>
-            <input
-              value={draft}
-              onChange={(event) => setDraft(event.target.value)}
-              maxLength={800}
-              placeholder={mid ? "Ask about your sales…" : "Getting your numbers…"}
-              aria-label="Ask about your sales"
-              disabled={!mid || chatLoading}
-            />
-            <button type="submit" disabled={!mid || !draft.trim() || chatLoading} aria-label="Send message">
-              <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
-                <path d="m5 12 14-7-4 14-3-6-7-1Z" />
-              </svg>
-            </button>
-          </form>
-          <p className={styles.chatFootnote}>Answers use your real sales data—never made-up numbers.</p>
+          {recorder.state === "recording" ? (
+            <div className={styles.recordingBar} role="status" aria-live="polite">
+              <span className={styles.recordingDot} aria-hidden="true" />
+              <span>
+                Listening… {`0:${String(recorder.seconds).padStart(2, "0")}`}
+                <small> / 0:{recorder.maxSeconds}</small>
+              </span>
+              <button type="button" className={styles.cancelButton} onClick={recorder.cancel}>Cancel</button>
+              <button type="button" className={styles.offerButton} onClick={recorder.stop}>Stop &amp; ask</button>
+            </div>
+          ) : (
+            <form className={`${styles.chatComposer} ${styles.askComposer}`} onSubmit={sendMessage}>
+              <button
+                type="button"
+                className={styles.micButton}
+                onClick={() => {
+                  recorder.clearError();
+                  stopAudio();
+                  void recorder.start();
+                }}
+                disabled={!mid || chatLoading || recorder.state === "requesting"}
+                aria-label="Ask by voice"
+                title="Ask by voice"
+              >
+                <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden="true">
+                  <rect x="9" y="3" width="6" height="11" rx="3" />
+                  <path d="M5 11a7 7 0 0 0 14 0M12 18v3" />
+                </svg>
+              </button>
+              <input
+                value={draft}
+                onChange={(event) => setDraft(event.target.value)}
+                maxLength={800}
+                placeholder={mid ? "Ask Bazaar anything…" : "Getting your numbers…"}
+                aria-label="Ask Bazaar a question"
+                disabled={!mid || chatLoading}
+              />
+              <button type="submit" disabled={!mid || !draft.trim() || chatLoading} aria-label="Send question">
+                <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
+                  <path d="m5 12 14-7-4 14-3-6-7-1Z" />
+                </svg>
+              </button>
+            </form>
+          )}
+          <p className={styles.chatFootnote}>Answers come from your own sales data. Nothing runs without your approval.</p>
         </section>
       </div>
     </SceneDialog>

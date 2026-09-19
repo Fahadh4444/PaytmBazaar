@@ -64,6 +64,7 @@ export function describeMemory(memory: MerchantMemory): string {
       ? `Main signal: ${lead.kind.toLowerCase().replace(/_/g, " ")} (${lead.direction}, ${lead.priority} priority).`
       : "No strong signal.",
     situation.patterns.length ? `Patterns: ${situation.patterns.map((p) => p.toLowerCase().replace(/_/g, " ")).join(", ")}.` : "",
+    memory.question ? `Merchant asked: "${memory.question}"` : "",
     memory.recommendation ? `Recommended: ${memory.recommendation.action}` : "",
     memory.action ? `Action ${memory.action.type.toLowerCase().replace(/_/g, " ")}: ${memory.action.status}.` : "",
     memory.outcome

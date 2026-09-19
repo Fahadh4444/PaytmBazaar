@@ -112,16 +112,20 @@ export const FLOW_STAGES: FlowStage[] = [
   },
   {
     id: "llm",
-    name: "LLM explanation",
-    kind: "Language model",
-    tagline: "Explains already-calculated facts in plain words.",
-    uses: ["A fact table of figures from M2M, Relevance and memory", "The ranked signals and the proposed action"],
-    does: [
-      "Writes the summary, why it matters and the recommendation wording",
-      "Cites a fact for each piece of evidence",
-      "Is checked: any figure not in the fact table rejects the reply, and rule-based wording is used instead",
+    name: "Ask Bazaar · Sarvam",
+    kind: "Language model and voice",
+    tagline: "Explains already-calculated facts in plain words, in the merchant's language, typed or spoken.",
+    uses: [
+      "A fact table of figures from M2M, Relevance and memory",
+      "The ranked signals, opportunities and the proposed action",
+      "The last few turns of the conversation",
     ],
-    doesNot: ["Calculate", "See transactions or other shops", "Choose the action"],
+    does: [
+      "Writes the summary and answers questions (Sarvam 105B, OpenRouter as fallback)",
+      "Replies in Indian languages; Sarvam speech-to-text and text-to-speech for voice",
+      "Is checked: any figure not in the fact table is corrected, removed, or replaced by rule-based wording",
+    ],
+    doesNot: ["Calculate", "See transactions or other shops", "Choose or run the action"],
   },
   {
     id: "approval",
@@ -258,7 +262,12 @@ export function flowState(source: InspectSource): FlowState {
         : { status: "unavailable", detail: "The explanation was not returned." }
       : insight.status === "generated"
         ? insight.source === "ai"
-          ? { status: "ran", detail: `${insight.model} explained ${insight.facts.length} facts; the reply passed the figure check.` }
+          ? {
+              status: "ran",
+              detail: source.live?.ask && source.live.ask.source !== "summary"
+                ? `${insight.model} explained ${insight.facts.length} facts; Ask Bazaar last answered in ${source.live.ask.language} via ${source.live.ask.provider}.`
+                : `${insight.model} explained ${insight.facts.length} facts; the reply passed the figure check.`,
+            }
           : { status: "unavailable", detail: "Not used this time: rule-based wording was shown instead." }
         : { status: "unavailable", detail: insight.status === "unavailable" ? "Not configured." : "Reply failed or was rejected; nothing was made up." };
 

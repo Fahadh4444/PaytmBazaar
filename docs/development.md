@@ -98,8 +98,8 @@ route or table arrives.
 
 Each is a real slot, none is wired up:
 
-- **Sarvam** — `lib/llm/sarvam.ts` implementing `LlmProvider`, registered in
-  `lib/llm/index.ts`. Needs confirmed access first.
+- **Sarvam** — implemented (`lib/llm/sarvam.ts`, `lib/speech/`); set
+  `SARVAM_API_KEY`. See [ask-bazaar.md](ask-bazaar.md#local-development).
 - **Cognee** — a client in `lib/cognee/` once the API surface is confirmed
   against real credentials.
 - **n8n** — a workflow trigger in `lib/n8n/`, called after merchant approval.

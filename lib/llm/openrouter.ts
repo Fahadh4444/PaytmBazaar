@@ -36,6 +36,7 @@ export const openRouterProvider: LlmProvider = {
   },
 
   async complete(request: LlmRequest): Promise<LlmResponse> {
+    const model = request.model ?? openRouterModel();
     const apiKey = process.env.OPENROUTER_API_KEY;
     if (!apiKey) {
       throw new LlmError("OPENROUTER_API_KEY is not set.", "openrouter");
@@ -54,7 +55,7 @@ export const openRouterProvider: LlmProvider = {
           "X-Title": "Paytm Bazaar",
         },
         body: JSON.stringify({
-          model: request.model ?? openRouterModel(),
+          model,
           messages: request.messages,
           temperature: request.temperature,
           max_tokens: request.maxTokens,
@@ -85,6 +86,6 @@ export const openRouterProvider: LlmProvider = {
       );
     }
 
-    return { text, provider: "openrouter" };
+    return { text, provider: "openrouter", model };
   },
 };

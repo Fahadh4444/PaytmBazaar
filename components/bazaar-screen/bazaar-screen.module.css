@@ -1040,3 +1040,207 @@
   background: #0b57d0;
   box-shadow: 0 0 0 4px rgba(11, 87, 208, 0.18);
 }
+
+/* ------------------------------------------------------------ Ask Bazaar */
+
+.askTagline {
+  margin: 7px 0 0;
+  font-size: 13px;
+  color: rgba(13, 27, 62, 0.62);
+}
+
+.askAnswer { animation: answerIn 220ms ease-out; }
+
+.evidenceList {
+  display: grid;
+  gap: 4px;
+  margin: 10px 0 0;
+  padding: 8px 10px;
+  border-radius: 10px;
+  background: #f1f6ff;
+  list-style: none;
+  white-space: normal;
+}
+
+.evidenceList li {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  font-size: 11px;
+  color: rgba(13, 27, 62, 0.7);
+}
+
+.evidenceList strong {
+  flex: none;
+  color: var(--ink);
+  font-family: var(--font-geist-mono), ui-monospace, monospace;
+}
+
+.answerTools {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin-top: 8px;
+  white-space: normal;
+}
+
+.answerTools > span {
+  padding: 3px 7px;
+  border-radius: 999px;
+  background: rgba(0, 186, 242, 0.12);
+  color: #075a86;
+  font-size: 10px;
+  letter-spacing: 0.04em;
+}
+
+.listenButton {
+  padding: 4px 9px;
+  border: 1px solid rgba(11, 87, 208, 0.24);
+  border-radius: 999px;
+  background: #fff;
+  color: var(--accent);
+  font: inherit;
+  font-size: 11px;
+  cursor: pointer;
+}
+
+.listenButton:hover:not(:disabled),
+.listenButton[aria-pressed="true"] { border-color: var(--accent); background: #eef4ff; }
+.listenButton:disabled { opacity: 0.6; cursor: progress; }
+
+.voiceTag { opacity: 0.85; }
+
+.chatAction > strong { font-size: 13px; line-height: 1.4; }
+
+.confirmCard {
+  display: grid;
+  gap: 8px;
+  margin: 10px 0;
+  padding: 14px;
+  border: 2px solid var(--accent);
+  border-radius: 14px;
+  background: #fff;
+  box-shadow: 0 14px 30px -24px rgba(11, 87, 208, 0.9);
+  animation: answerIn 180ms ease-out;
+}
+
+.confirmCard > span {
+  color: var(--accent);
+  font: 700 10px/1 var(--font-geist-mono), ui-monospace, monospace;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.confirmCard > strong { font-size: 14px; line-height: 1.35; }
+.confirmCard > p { margin: 0; font-size: 12px; line-height: 1.45; color: rgba(13, 27, 62, 0.68); }
+
+.confirmButtons {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.confirmButtons .offerButton { margin-top: 0; }
+
+.cancelButton {
+  padding: 9px 16px;
+  border: 1px solid rgba(13, 27, 62, 0.22);
+  border-radius: 999px;
+  background: #fff;
+  color: var(--ink);
+  font: inherit;
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.cancelButton:hover:not(:disabled) { border-color: var(--ink); }
+
+.actionNote {
+  margin: 6px 0 0;
+  font-size: 12px;
+  color: #087c4a;
+}
+
+.thinking {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  color: rgba(13, 27, 62, 0.64);
+}
+
+.thinking i {
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: var(--accent);
+  animation: thinkingDot 1.1s ease-in-out infinite;
+}
+
+.thinking i:nth-child(2) { animation-delay: 0.15s; }
+.thinking i:nth-child(3) { animation-delay: 0.3s; }
+.thinking span { margin-left: 6px; }
+
+.askComposer {
+  grid-template-columns: 42px 1fr 42px;
+  border-radius: 14px;
+}
+
+.askComposer button { border-radius: 10px; }
+
+.chatComposer .micButton {
+  background: #e9f1ff;
+  color: var(--accent);
+}
+
+.chatComposer .micButton:hover:not(:disabled) { background: #dbe8ff; }
+
+.recordingBar {
+  display: grid;
+  grid-template-columns: auto 1fr auto auto;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 8px 8px 14px;
+  border: 2px solid #c8283d;
+  border-radius: 14px;
+  background: #fff;
+  font-size: 13px;
+}
+
+.recordingBar small { color: rgba(13, 27, 62, 0.5); }
+.recordingBar .offerButton { margin-top: 0; padding: 9px 14px; }
+
+.recordingDot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: #d92d42;
+  animation: recordingPulse 1.2s ease-out infinite;
+}
+
+@keyframes answerIn {
+  from { opacity: 0; transform: translateY(4px); }
+  to { opacity: 1; transform: none; }
+}
+
+@keyframes thinkingDot {
+  0%, 80%, 100% { opacity: 0.25; transform: translateY(0); }
+  40% { opacity: 1; transform: translateY(-2px); }
+}
+
+@keyframes recordingPulse {
+  0% { box-shadow: 0 0 0 0 rgba(217, 45, 66, 0.45); }
+  100% { box-shadow: 0 0 0 9px rgba(217, 45, 66, 0); }
+}
+
+@media (max-width: 520px) {
+  .recordingBar { grid-template-columns: auto 1fr; }
+  .recordingBar button { width: 100%; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .askAnswer,
+  .confirmCard,
+  .thinking i,
+  .recordingDot { animation: none; }
+}

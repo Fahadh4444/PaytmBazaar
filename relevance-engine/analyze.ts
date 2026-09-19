@@ -62,6 +62,18 @@ function cohortConfidence(m2m: M2MIntelligence): CohortConfidence {
 
 export function analyzeRelevance(m2m: M2MIntelligence): RelevantIntelligence {
   const { signals, dismissed } = extractSignals(m2m);
+  const selected = m2m.contextImpact;
+  if (selected?.status === "meaningful_change" && selected.strongestDimension) {
+    const strongest = selected.evidence.find((e) => e.dimension === selected.strongestDimension);
+    const match = strongest && signals.find((s) => s.id === `context:${strongest.dimension}:${strongest.segment}`);
+    if (match) {
+      // The evidence and magnitude are unchanged; user-selected relevance only
+      // breaks ranking ties and can raise visibility by one small, explicit step.
+      match.score = Math.min(100, match.score + 10);
+      match.priority = priorityOf(match.score);
+      match.reasons.push("MATCHES_SELECTED_CONTEXT");
+    }
+  }
   const byId = new Map(signals.map((s) => [s.id, s]));
 
   // Link each opportunity to the signals it rests on, and credit those signals.
@@ -125,5 +137,6 @@ export function analyzeRelevance(m2m: M2MIntelligence): RelevantIntelligence {
     relevantOpportunities,
     dismissed,
     limitations: m2m.limitations,
+    contextImpact: m2m.contextImpact,
   };
 }

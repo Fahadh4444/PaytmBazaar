@@ -13,7 +13,7 @@ export interface PromotionParameters {
   /** Time of day the promotion targets, or `all_day`. */
   targetSegment: "morning" | "afternoon" | "evening" | "night" | "all_day";
   durationDays: number;
-  channel: "paytm_merchant_notification";
+  channel: "email";
 }
 
 /** What an executor receives: structured, validated fields only, never raw model output. */

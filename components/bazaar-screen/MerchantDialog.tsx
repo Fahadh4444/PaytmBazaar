@@ -3,11 +3,11 @@
 import { useEffect, useRef, useState, type FormEvent } from "react";
 
 import SceneDialog from "@/components/bazaar/SceneDialog";
+import { contextQuery, intelligenceContext, type CityContext } from "@/components/city/context";
 import { shops, type Shop } from "@/data/shops";
 import { GrowthBars } from "@/components/intelligence/Charts";
 import ist from "@/components/intelligence/intelligence.module.css";
 import DialogTools from "@/components/intelligence/inspect/DialogTools";
-import type { SceneContext } from "@/components/intelligence/inspect/trace";
 import { describeTopSignal, followUpQuestions, formatGrowth, merchantForBuilding } from "@/components/intelligence/present";
 import RichText, { inline } from "@/components/intelligence/RichText";
 import type {
@@ -17,6 +17,7 @@ import type {
   MerchantBasics,
   MerchantExplanation,
 } from "@/merchant-intelligence";
+import type { SelectedContextEvidence } from "@/m2m-engine";
 
 import styles from "./bazaar-screen.module.css";
 
@@ -26,8 +27,7 @@ type MerchantDialogProps = {
   bazaarName: string;
   open: boolean;
   onClose: () => void;
-  /** The screen's Day / Time / Weather / Event controls, shown in the Trace. */
-  sceneContext?: SceneContext;
+  context: CityContext;
 };
 
 type ChatMessage = { role: "user" | "assistant"; content: string };
@@ -75,7 +75,7 @@ export default function MerchantDialog({
   bazaarName,
   open,
   onClose,
-  sceneContext,
+  context,
 }: MerchantDialogProps) {
   const [basics, setBasics] = useState<MerchantBasics | null>(null);
   const [explanation, setExplanation] = useState<MerchantExplanation | null>(null);
@@ -91,6 +91,13 @@ export default function MerchantDialog({
   const [measured, setMeasured] = useState<MeasuredOutcome | null>(null);
   const [approval, setApproval] = useState<ActionExecutionOutcome | null>(null);
   const [resultNote, setResultNote] = useState<string | null>(null);
+  const [view, setView] = useState<"intelligence" | "simulation">("intelligence");
+  const [simulation, setSimulation] = useState<MerchantBasics | null>(null);
+  const [simulationContext, setSimulationContext] = useState<CityContext | null>(null);
+  const [simulationLoading, setSimulationLoading] = useState(false);
+  const [simulationError, setSimulationError] = useState<string | null>(null);
+  const [simulationActionState, setSimulationActionState] = useState<"idle" | "running" | "done">("idle");
+  const [simulationActionResult, setSimulationActionResult] = useState<string | null>(null);
   const conversationRef = useRef<HTMLDivElement>(null);
 
   const mid = basics?.merchant.mid;
@@ -101,6 +108,12 @@ export default function MerchantDialog({
     const aborted = (error: unknown) => error instanceof DOMException && error.name === "AbortError";
 
     (async () => {
+      setAnalysisLoading(true);
+      setSummaryLoading(true);
+      setAnalysisError(null);
+      setExplanation(null);
+      setActionState("idle");
+      setActionResult(null);
       // Every Bazaar shares one street render: building N opens the Bazaar's Nth merchant.
       const merchants = await bazaarMerchants(bazaarId);
       if (merchants.length === 0) throw new Error("This Bazaar has no shops yet.");
@@ -235,6 +248,87 @@ export default function MerchantDialog({
   const running = recommendation?.status === "proposed" && (recommendation.actionStatus === "executed" || actionState === "done");
   const title = basics?.merchant.name ?? (shop ? shop.name : "Merchant");
 
+  const behaviour = (item: SelectedContextEvidence, label: string) => {
+    if (!item.supported || item.merchantGrowth === null || item.cohortGrowth === null || item.gapPp === null) {
+      return `Not enough historical evidence for ${label}.`;
+    }
+    const merchantMove = item.merchantGrowth >= 0 ? `grew ${item.merchantGrowth.toFixed(1)}%` : `fell ${Math.abs(item.merchantGrowth).toFixed(1)}%`;
+    const peerMove = item.cohortGrowth >= 0 ? `grew ${item.cohortGrowth.toFixed(1)}%` : `fell ${Math.abs(item.cohortGrowth).toFixed(1)}%`;
+    const relative = item.gapPp < 0
+      ? `That is ${Math.abs(item.gapPp).toFixed(1)} points behind similar shops.`
+      : item.gapPp > 0
+        ? `That is ${item.gapPp.toFixed(1)} points ahead of similar shops.`
+        : "That is in line with similar shops.";
+    return `Historically under ${label}, your sales ${merchantMove}, while similar shops ${peerMove}. ${relative}`;
+  };
+
+  const runSimulation = async () => {
+    if (!mid || simulationLoading) return;
+    const snapshot = { ...context };
+    setView("simulation");
+    setSimulationLoading(true);
+    setSimulationError(null);
+    setSimulation(null);
+    setSimulationContext(snapshot);
+    try {
+      const response = await fetch(`/api/merchants/${encodeURIComponent(mid)}/intelligence?view=basic&${contextQuery(snapshot)}`);
+      if (!response.ok) throw new Error(await readError(response, "The simulation could not be completed."));
+      setSimulation((await response.json()) as MerchantBasics);
+    } catch (error) {
+      setSimulationError(error instanceof Error ? error.message : "The simulation could not be completed.");
+    } finally {
+      setSimulationLoading(false);
+    }
+  };
+
+  const simulationLabels = simulationContext ? {
+    dayOfWeek: simulationContext.day,
+    timeOfDay: `${simulationContext.hour.toString().padStart(2, "0")}:00`,
+    weather: simulationContext.weather,
+    event: simulationContext.event,
+  } : null;
+  const baselineGrowth = basics?.m2m.merchantMetrics.current.growth ?? null;
+  const scenarioGrowth = simulation?.m2m.contextImpact?.forecast.expectedChangePercent ?? null;
+  const scenarioDelta = baselineGrowth !== null && scenarioGrowth !== null
+    ? Math.round((scenarioGrowth - baselineGrowth) * 10) / 10 : null;
+  const simulationAction = (() => {
+    const forecast = simulation?.m2m.contextImpact?.forecast;
+    if (!forecast || forecast.confidence === "insufficient") return "Collect more observations before changing your plan.";
+    if ((forecast.relativeToPeersPp ?? 0) < -5) return `Test a targeted Paytm offer for the selected ${simulationContext?.hour.toString().padStart(2, "0")}:00 window, then measure the result.`;
+    if (forecast.direction === "increase") return "Email opted-in customers before this window to capture the stronger expected demand.";
+    return "No context-specific promotion is indicated; keep the normal merchant plan and monitor the result.";
+  })();
+  const lastQuestion = [...messages].reverse().find((message) => message.role === "user")?.content ?? "";
+  const asksForAction = /what (?:can|should) i do|increase|grow|improve|offer|recommend|notify|campaign/i.test(lastQuestion);
+
+  const notifyFromSimulation = async () => {
+    if (!mid || !simulationContext || simulationActionState === "running") return;
+    setSimulationActionState("running");
+    setSimulationActionResult(null);
+    try {
+      const response = await fetch(`/api/merchants/${encodeURIComponent(mid)}/actions`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ approved: true, context: intelligenceContext(simulationContext) }),
+      });
+      const body = await response.json();
+      if (!response.ok && response.status !== 502) throw new Error(body?.error?.message ?? "The email could not be sent.");
+      if (body.execution?.status === "executed") {
+        setSimulationActionState("done");
+        setSimulationActionResult("The approved email was sent by the n8n workflow.");
+      } else if (body.execution?.status === "failed") {
+        setSimulationActionState("idle");
+        setSimulationActionResult("The email workflow failed. Please try again.");
+      } else {
+        setSimulationActionState("done");
+        setSimulationActionResult("Approved and queued. Connect the n8n executor to deliver it.");
+      }
+    } catch (error) {
+      setSimulationActionState("idle");
+      setSimulationActionResult(error instanceof Error ? error.message : "The email could not be sent.");
+    }
+  };
+
   return (
     <SceneDialog
       open={open}
@@ -246,7 +340,7 @@ export default function MerchantDialog({
         open ? (
           <DialogTools
             subject={title}
-            scene={sceneContext}
+            scene={context}
             source={{
               scope: "merchant",
               basics,
@@ -262,7 +356,72 @@ export default function MerchantDialog({
     >
       <p className={styles.dialogLede}>{bazaarName}</p>
 
-      <div className={styles.merchantWorkspace}>
+      <div className={styles.viewTabs} role="tablist" aria-label="Merchant views">
+        <button type="button" role="tab" aria-selected={view === "intelligence"} onClick={() => setView("intelligence")}>Merchant intelligence</button>
+        <button type="button" role="tab" aria-selected={view === "simulation"} onClick={runSimulation} disabled={!mid || simulationLoading}>
+          {simulationLoading ? "Running simulation…" : "Run context simulation"}
+        </button>
+      </div>
+
+      {view === "simulation" && (
+        <section className={styles.simulationWorkspace} role="tabpanel" aria-live="polite">
+          <div className={styles.sectionHeadingRow}>
+            <div>
+              <p className={styles.sectionKicker}>Context simulation</p>
+              <h3 className={styles.workspaceHeading}>How behavior may differ</h3>
+            </div>
+            {simulationContext && <span className={styles.dataStamp}>{simulationContext.day} · {simulationContext.hour.toString().padStart(2, "0")}:00 · {simulationContext.weather} · {simulationContext.event}</span>}
+          </div>
+          {simulationLoading && <div className={styles.analysisState}>Analyzing Bazaar signals…</div>}
+          {simulationError && <div className={styles.analysisState}>{simulationError}</div>}
+          {simulation?.m2m.contextImpact && simulationLabels && (
+            <>
+              <div className={styles.forecastHero} data-confidence={simulation.m2m.contextImpact.forecast.confidence}>
+                <span>Combined behavior forecast</span>
+                <strong>{simulation.m2m.contextImpact.forecast.direction === "unknown" ? "Not enough evidence" : `Sales may ${simulation.m2m.contextImpact.forecast.direction}`}</strong>
+                <p>{simulation.m2m.contextImpact.forecast.insight}</p>
+                {scenarioDelta !== null && (
+                  <p>
+                    Compared with your normal Merchant Intelligence outlook ({signed(baselineGrowth)}), this scenario is {Math.abs(scenarioDelta).toFixed(1)} points {scenarioDelta >= 0 ? "stronger" : "weaker"}.
+                  </p>
+                )}
+                <small>
+                  {simulation.m2m.contextImpact.combined.basis === "exact_combination"
+                    ? `Based on ${simulation.m2m.contextImpact.combined.merchantTransactions} historical orders matching all four conditions.`
+                    : simulation.m2m.contextImpact.combined.basis === "dimension_model"
+                      ? "Built by conservatively combining the supported day, time, weather and event signals because the exact intersection is sparse."
+                      : "No reliable combined model could be produced for this selection."}
+                  {` Confidence: ${simulation.m2m.contextImpact.forecast.confidence}.`}
+                </small>
+              </div>
+              <section className={styles.simulationRecommendation}>
+                <span>Simulation insight</span>
+                <strong>{simulationAction}</strong>
+                <small>This is a suggested response only. The workflow runs only after you explicitly approve below.</small>
+                <button type="button" className={styles.rerunButton} onClick={notifyFromSimulation} disabled={simulationActionState !== "idle" || simulation.m2m.contextImpact.forecast.confidence === "insufficient"}>
+                  {simulationActionState === "running" ? "Sending…" : simulationActionState === "done" ? "Email sent" : "Approve and email customers"}
+                </button>
+                {simulationActionResult && <p>{simulationActionResult}</p>}
+              </section>
+              <p className={styles.simulationSummary}>Why the model reached this result</p>
+              <div className={styles.simulationGrid}>
+                {simulation.m2m.contextImpact.evidence.map((item) => (
+                  <article key={item.dimension} className={styles.simulationCard} data-supported={item.supported || undefined}>
+                    <span>{item.dimension === "dayOfWeek" ? "Day" : item.dimension === "timeOfDay" ? "Time" : item.dimension}</span>
+                    <strong>{simulationLabels[item.dimension]}</strong>
+                    <p>{behaviour(item, simulationLabels[item.dimension])}</p>
+                    <small>{item.merchantTransactions} of your paid orders in the current comparison period.</small>
+                  </article>
+                ))}
+              </div>
+              <p className={styles.simulationNote}>This is a data-driven scenario estimate, not a guarantee or proof that the selected conditions cause the change.</p>
+              <button type="button" className={styles.rerunButton} onClick={runSimulation}>Run again with current controls</button>
+            </>
+          )}
+        </section>
+      )}
+
+      <div className={styles.merchantWorkspace} hidden={view !== "intelligence"}>
         <section className={styles.analysisPanel} aria-labelledby="analysis-heading">
           <div className={styles.sectionHeadingRow}>
             <div>
@@ -435,13 +594,22 @@ export default function MerchantDialog({
               </div>
             ))}
             {!chatLoading && messages.at(-1)?.role === "assistant" && (
-              <div className={styles.suggestions}>
-                {followUpQuestions(messages.map((m) => m.content), recommendation?.status === "proposed" && !running).map((q) => (
-                  <button key={q} type="button" onClick={() => ask(q)}>
-                    {q}
-                  </button>
-                ))}
-              </div>
+              <>
+                {asksForAction && recommendation?.status === "proposed" && recommendation.actionId && !running && (
+                  <div className={styles.chatAction}>
+                    <span>Act on this answer</span>
+                    <button type="button" className={styles.offerButton} onClick={approveAction} disabled={actionState === "running"}>
+                      {actionState === "running" ? "Sending…" : "Approve and email customers"}
+                    </button>
+                    <small>The assistant text is never executed. n8n receives the validated merchant action only.</small>
+                  </div>
+                )}
+                <div className={styles.suggestions}>
+                  {followUpQuestions(messages.map((m) => m.content), recommendation?.status === "proposed" && !running).map((q) => (
+                    <button key={q} type="button" onClick={() => ask(q)}>{q}</button>
+                  ))}
+                </div>
+              </>
             )}
             {chatLoading && <div className={styles.assistantMessage}>Looking at your sales…</div>}
           </div>

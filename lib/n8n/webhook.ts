@@ -35,12 +35,14 @@ export const n8nWebhookExecutor: ActionExecutor = {
   name: "n8n",
 
   isConfigured() {
-    return n8nWebhookUrl() !== null;
+    return n8nWebhookUrl() !== null && Boolean(process.env.N8N_EMAIL_RECIPIENT && process.env.N8N_EMAIL_FROM);
   },
 
   async execute(request: ActionExecutionRequest): Promise<ActionExecutionResult> {
     const url = n8nWebhookUrl();
-    if (!url) return failed("n8n is not configured.");
+    const recipient = process.env.N8N_EMAIL_RECIPIENT;
+    const from = process.env.N8N_EMAIL_FROM;
+    if (!url || !recipient || !from) return failed("n8n email delivery is not configured.");
 
     const headers: Record<string, string> = { "Content-Type": "application/json" };
     if (process.env.N8N_WEBHOOK_SECRET) headers["X-Bazaar-Secret"] = process.env.N8N_WEBHOOK_SECRET;
@@ -50,7 +52,7 @@ export const n8nWebhookExecutor: ActionExecutor = {
       response = await fetch(url, {
         method: "POST",
         headers,
-        body: JSON.stringify(request),
+        body: JSON.stringify({ ...request, delivery: { channel: "email", recipient, from } }),
         signal: AbortSignal.timeout(TIMEOUT_MS),
       });
     } catch {

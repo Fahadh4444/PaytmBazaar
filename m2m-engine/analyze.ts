@@ -13,7 +13,7 @@
 
 import { getRelevantCohort, cityMerchants, cityOf, type Network } from "./cohort";
 import { compareWithNetwork } from "./comparison";
-import { analyzeContext } from "./context";
+import { analyzeContext, combinedContextImpact, selectedContextImpact } from "./context";
 import { buildEvidence } from "./evidence";
 import {
   calculateBazaarMetrics,
@@ -35,6 +35,7 @@ import type {
   MerchantDailyMetric,
   PaymentEvent,
   PaytmDataSource,
+  SelectedContext,
 } from "./types";
 
 /** Everything the pure pipeline needs, already fetched. */
@@ -45,7 +46,7 @@ export interface M2MSnapshot extends Network {
   events: PaymentEvent[];
 }
 
-export function buildM2MIntelligence(snapshot: M2MSnapshot, period: ComparisonPeriod): M2MIntelligence {
+export function buildM2MIntelligence(snapshot: M2MSnapshot, period: ComparisonPeriod, selected?: SelectedContext): M2MIntelligence {
   const { merchant, dailyMetrics: rows, events } = snapshot;
   const network: Network = { bazaars: snapshot.bazaars, merchants: snapshot.merchants };
 
@@ -110,6 +111,7 @@ export function buildM2MIntelligence(snapshot: M2MSnapshot, period: ComparisonPe
     cityMetrics,
     comparisons,
     context,
+    contextImpact: selected ? combinedContextImpact(selectedContextImpact(context, selected), merchant.mid, cohort.reportable ? cohort.cohortMerchantIds : [], events, period) : null,
     patterns,
     evidence,
     bazaarImpact,
@@ -124,6 +126,7 @@ export interface AnalyzeMerchantInput {
   current: DateRange;
   /** Defaults to the equally long period immediately before `current`. */
   previous?: DateRange;
+  context?: SelectedContext;
 }
 
 /**
@@ -154,5 +157,5 @@ export async function analyzeMerchant(
     }),
   ]);
 
-  return buildM2MIntelligence({ ...network, merchant, dailyMetrics, events }, period);
+  return buildM2MIntelligence({ ...network, merchant, dailyMetrics, events }, period, input.context);
 }

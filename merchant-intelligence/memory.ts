@@ -9,7 +9,7 @@ import type { RelevantIntelligence } from "@/relevance-engine";
 
 import type { HistoryResult, MemoryWriteStatus } from "./types";
 
-export function situationOf(relevance: RelevantIntelligence): MerchantMemory["situation"] {
+export function situationOf(relevance: RelevantIntelligence, context?: { requested: Record<string, string>; status: string }): MerchantMemory["situation"] {
   return {
     period: relevance.period.current,
     topPriority: relevance.topPriority,
@@ -22,6 +22,8 @@ export function situationOf(relevance: RelevantIntelligence): MerchantMemory["si
       magnitudePp: s.magnitudePp,
     })),
     patterns: relevance.relevantPatterns.map((p) => p.type),
+    context: context?.requested,
+    contextStatus: context?.status,
   };
 }
 

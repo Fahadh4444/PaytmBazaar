@@ -11,6 +11,7 @@ import type {
   CohortSummary,
   ComparisonPeriod,
   DataLimitation,
+  ContextImpact,
   Evidence,
   MerchantCategory,
   Opportunity,
@@ -53,6 +54,7 @@ export type RelevanceReason =
   | "FULL_SEGMENT_SUPPORT"
   | "LIMITED_SEGMENT_SUPPORT"
   | "ASSOCIATION_NOT_CAUSE"
+  | "MATCHES_SELECTED_CONTEXT"
   | "MOVES_WITH_NETWORK"
   | "LINKED_TO_OPPORTUNITY";
 
@@ -152,4 +154,5 @@ export interface RelevantIntelligence {
   dismissed: DismissedSignal[];
   /** Passed through from M2M. */
   limitations: DataLimitation[];
+  contextImpact?: ContextImpact | null;
 }

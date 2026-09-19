@@ -1,6 +1,7 @@
 import { badRequest, errorResponse } from "@/app/api/_lib/errors";
 import { analyzeMerchantIntelligence } from "@/merchant-intelligence";
 import { getCachedBasics, getCachedExplanation, getIntelligenceDeps } from "@/merchant-intelligence/server";
+import { contextFromUrl } from "@/merchant-intelligence/context-request";
 
 export const dynamic = "force-dynamic";
 
@@ -22,12 +23,13 @@ export async function GET(request: Request, { params }: { params: Promise<{ merc
   if ((from === null) !== (to === null)) return badRequest("Pass both from and to, or neither.");
 
   try {
+    const context = contextFromUrl(url);
     const deps = getIntelligenceDeps();
-    if (from && to) return Response.json(await analyzeMerchantIntelligence(deps, { merchantId, current: { from, to } }));
+    if (from && to) return Response.json(await analyzeMerchantIntelligence(deps, { merchantId, current: { from, to }, context }));
 
-    const basics = await getCachedBasics(deps, merchantId);
+    const basics = await getCachedBasics(deps, merchantId, context);
     if (basicOnly) return Response.json(basics);
-    return Response.json({ ...basics, ...(await getCachedExplanation(deps, merchantId)) });
+    return Response.json({ ...basics, ...(await getCachedExplanation(deps, merchantId, context)) });
   } catch (error) {
     return errorResponse(error);
   }

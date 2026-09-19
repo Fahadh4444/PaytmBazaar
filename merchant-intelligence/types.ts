@@ -7,7 +7,7 @@ import type { MemoryProvider, MerchantMemory } from "@/lib/cognee";
 import type { LlmProvider } from "@/lib/llm";
 import type { ActionExecutionResult, ActionExecutor, PromotionParameters } from "@/lib/n8n";
 import type { MerchantActionRecord, MerchantActionStore } from "@/lib/paytm/adapter/actions";
-import type { ComparisonPeriod, DateRange, M2MIntelligence, MerchantCategory, OpportunityType, PaytmDataSource } from "@/m2m-engine";
+import type { ComparisonPeriod, DateRange, M2MIntelligence, MerchantCategory, OpportunityType, PaytmDataSource, SelectedContext } from "@/m2m-engine";
 import type { RelevantIntelligence } from "@/relevance-engine";
 
 /** Everything the service talks to, injected so tests can replace any of it. */
@@ -101,6 +101,7 @@ export interface ProposedAction {
     signalIds: string[];
     period: DateRange;
     topPriority: string | null;
+    context?: SelectedContext;
   };
 }
 

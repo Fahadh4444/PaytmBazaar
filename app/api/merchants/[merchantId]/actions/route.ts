@@ -1,6 +1,7 @@
 import { badRequest, errorResponse, readJson } from "@/app/api/_lib/errors";
-import { executeApprovedAction } from "@/merchant-intelligence";
+import { executeApprovedAction, getMerchantBasics, proposeAction } from "@/merchant-intelligence";
 import { getIntelligenceDeps, onMerchantActionChanged } from "@/merchant-intelligence/server";
+import { contextFromValue } from "@/merchant-intelligence/context-request";
 
 export const dynamic = "force-dynamic";
 
@@ -15,12 +16,36 @@ export const dynamic = "force-dynamic";
 export async function POST(request: Request, { params }: { params: Promise<{ merchantId: string }> }) {
   const { merchantId } = await params;
   const body = await readJson(request);
-  if (!body || typeof body.actionId !== "string") return badRequest("actionId is required.");
+  if (!body) return badRequest("An action request is required.");
 
   try {
-    const outcome = await executeApprovedAction(getIntelligenceDeps(), {
+    const deps = getIntelligenceDeps();
+    let actionId = typeof body.actionId === "string" ? body.actionId : null;
+    if (!actionId && body.context) {
+      if (body.approved !== true) return badRequest("Explicit approval is required.");
+      if (!deps.actions) return Response.json({ error: { code: "action_store_unavailable", message: "Action storage is not available." } }, { status: 503 });
+      const context = contextFromValue(body.context);
+      const basics = await getMerchantBasics(deps, { merchantId, context });
+      const candidate = proposeAction(basics.relevance);
+      if (!candidate) return badRequest("This simulation does not contain an actionable opportunity.");
+      const created = await deps.actions.create({
+        merchantId,
+        type: candidate.type,
+        parameters: { ...candidate.parameters, targetSegment: context.timeOfDay, durationDays: 1 },
+        description: `Email opted-in customers about the selected ${context.timeOfDay} offer.`,
+        basis: {
+          ...candidate.basis,
+          context,
+          source: "context_simulation",
+          forecast: basics.m2m.contextImpact?.forecast ?? null,
+        },
+      });
+      actionId = created.id;
+    }
+    if (!actionId) return badRequest("actionId or an approved simulation context is required.");
+    const outcome = await executeApprovedAction(deps, {
       merchantId,
-      actionId: body.actionId,
+      actionId,
       approved: body.approved,
     });
     onMerchantActionChanged(merchantId);

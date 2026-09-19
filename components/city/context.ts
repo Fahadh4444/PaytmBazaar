@@ -13,8 +13,8 @@
  */
 
 export const DAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"] as const;
-export const WEATHERS = ["Clear", "Rain", "Cold", "Hot"] as const;
-export const EVENTS = ["None", "Festival", "Holiday", "Local Event"] as const;
+export const WEATHERS = ["Clear", "Cloudy", "Rain", "Heavy Rain"] as const;
+export const EVENTS = ["None", "Festival", "Public Holiday", "Local Event", "Sports Event", "Payday"] as const;
 
 /** Whole hours are enough resolution for the demo. */
 export const HOURS = Array.from({ length: 24 }, (_, hour) => hour);
@@ -40,6 +40,23 @@ export const DEFAULT_CONTEXT: CityContext = {
 
 export function formatHour(hour: number): string {
   return `${String(hour).padStart(2, "0")}:00`;
+}
+
+/** Maps display controls to the canonical values used by the intelligence domain. */
+export function intelligenceContext(context: CityContext) {
+  const days = ["sunday", "monday", "tuesday", "wednesday", "thursday", "friday", "saturday"] as const;
+  const weather = { Clear: "clear", Cloudy: "cloudy", Rain: "rain", "Heavy Rain": "heavy_rain" } as const;
+  const event = {
+    None: "none", Festival: "festival", "Public Holiday": "public_holiday",
+    "Local Event": "local_event", "Sports Event": "sports_event", Payday: "payday",
+  } as const;
+  const timeOfDay = context.hour >= 5 && context.hour < 12 ? "morning"
+    : context.hour < 17 ? "afternoon" : context.hour < 21 ? "evening" : "night";
+  return { dayOfWeek: days[DAYS.indexOf(context.day)], timeOfDay, weather: weather[context.weather], event: event[context.event] };
+}
+
+export function contextQuery(context: CityContext): string {
+  return new URLSearchParams(intelligenceContext(context)).toString();
 }
 
 export type DaylightPhase = "dawn" | "day" | "dusk" | "night";

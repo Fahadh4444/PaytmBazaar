@@ -15,6 +15,7 @@ import {
   getRelevantCohort,
   growthPercent,
   M2MInputError,
+  selectedContextImpact,
   type ComparisonPeriod,
   type Evidence,
   type GroupMetrics,
@@ -269,6 +270,37 @@ describe("context analysis", () => {
     const night = find("timeOfDay", "night");
     assert.equal(night.cohortContributors, 2);
     assert.equal(night.cohort, null);
+  });
+
+  it("reports supported selected dimensions without pretending the exact combination was measured", () => {
+    const impact = selectedContextImpact(context, {
+      dayOfWeek: "friday", timeOfDay: "evening", weather: "rain", event: "none",
+    });
+    assert.equal(impact.level, "single_dimensions");
+    assert.equal(impact.status, "meaningful_change");
+    assert.equal(impact.strongestDimension, "timeOfDay");
+    assert.equal(impact.evidence.find((e) => e.dimension === "timeOfDay")?.gapPp, -90);
+  });
+
+  it("returns insufficient evidence instead of fabricating a context effect", () => {
+    const impact = selectedContextImpact(context, {
+      dayOfWeek: "monday", timeOfDay: "night", weather: "heavy_rain", event: "festival",
+    });
+    assert.equal(impact.status, "insufficient_evidence");
+    assert.equal(impact.strongestDimension, null);
+  });
+
+  it("combines all four controls into an exact-match behavior forecast when evidence supports it", async () => {
+    const result = await analyzeMerchant(fakeDataSource(), {
+      merchantId: "TARGET",
+      current: CURRENT,
+      context: { dayOfWeek: "friday", timeOfDay: "evening", weather: "rain", event: "none" },
+    });
+    assert.equal(result.contextImpact?.combined.basis, "exact_combination");
+    assert.equal(result.contextImpact?.combined.merchantGrowth, -40);
+    assert.equal(result.contextImpact?.combined.cohortGrowth, 50);
+    assert.equal(result.contextImpact?.forecast.direction, "decrease");
+    assert.equal(result.contextImpact?.forecast.confidence, "high");
   });
 });
 

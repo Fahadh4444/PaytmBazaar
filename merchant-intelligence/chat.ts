@@ -5,7 +5,7 @@
  */
 
 import type { LlmMessage } from "@/lib/llm";
-import { analyzeMerchant, lastNDays } from "@/m2m-engine";
+import { analyzeMerchant, lastNDays, type SelectedContext } from "@/m2m-engine";
 import { analyzeRelevance } from "@/relevance-engine";
 
 import { noMerchantData } from "./errors";
@@ -54,12 +54,12 @@ export function validChatMessages(value: unknown): LlmMessage[] | null {
 
 export async function answerMerchantQuestion(
   deps: IntelligenceDeps,
-  input: { merchantId: string; messages: LlmMessage[] },
+  input: { merchantId: string; messages: LlmMessage[]; context?: SelectedContext },
 ): Promise<ChatResult> {
   const merchant = await deps.dataSource.getMerchantWithBazaar(input.merchantId);
   const latest = (await deps.dataSource.getMerchantDailyMetrics(merchant.mid)).map((d) => d.businessDate).sort().at(-1);
   if (!latest) throw noMerchantData();
-  const m2m = await analyzeMerchant(deps.dataSource, { merchantId: merchant.mid, current: lastNDays(latest, 7) });
+  const m2m = await analyzeMerchant(deps.dataSource, { merchantId: merchant.mid, current: lastNDays(latest, 7), context: input.context });
   const relevance = analyzeRelevance(m2m);
   const facts = buildFacts(m2m, relevance, [], null);
   const summary = (): ChatResult => ({ status: "answered", message: fallbackAnswer(facts), provider: "rules", source: "summary" });
@@ -79,7 +79,7 @@ export async function answerMerchantQuestion(
     "Advice must be specific and varied, never generic. Do not say 'keep extra stock' or 'keep staff ready'.",
     "Pick ONE concrete move tied to a fact above, such as: a Paytm cashback or discount in the weakest time slot or day,",
     "  a combo or add-on to raise the average bill, a weekend or evening special, a reward for repeat customers,",
-    "  or a Paytm notification to regulars. Name the day or time it targets and why, using the fact.",
+    "  or an email to opted-in regular customers. Name the day or time it targets and why, using the fact.",
     "Never repeat advice already given earlier in this conversation; offer a different angle instead.",
     "Use short bullet lines with '- ' when listing, and **bold** only for the key number or action.",
     "If you suggest an offer amount, keep it modest (for example 5-10% cashback or ₹20 off) and present it as a suggestion.",
@@ -90,6 +90,7 @@ export async function answerMerchantQuestion(
     `Merchant: ${merchant.name} (${merchant.category}) in ${merchant.bazaar.name}, ${merchant.bazaar.city}.`,
     `Latest data: ${m2m.period.current.from} to ${m2m.period.current.to}, compared with ${m2m.period.previous.from} to ${m2m.period.previous.to}.`,
     `Leading signals: ${JSON.stringify(relevance.prioritySignals.map((s) => ({ kind: s.kind, direction: s.direction, priority: s.priority })))}`,
+    `Selected context evidence: ${JSON.stringify(m2m.contextImpact ?? null)}`,
     `facts: ${JSON.stringify(facts)}`,
   ].join("\n");
 

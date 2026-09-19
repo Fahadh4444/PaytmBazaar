@@ -18,7 +18,7 @@ import { getBazaarIntelligence, getCityIntelligence, loadNetwork, type NetworkSn
 import { cached, invalidateMerchant } from "./cache";
 import { withRetry } from "./retry";
 import { explainMerchant, getMerchantBasics } from "./service";
-import type { AreaIntelligence } from "@/m2m-engine";
+import type { AreaIntelligence, SelectedContext } from "@/m2m-engine";
 
 import type { IntelligenceDeps, MerchantBasics, MerchantExplanation } from "./types";
 
@@ -46,15 +46,18 @@ export function getIntelligenceDeps(): IntelligenceDeps {
 }
 
 /** Numbers for the latest period, cached. */
-export function getCachedBasics(deps: IntelligenceDeps, merchantId: string): Promise<MerchantBasics> {
-  return cached(`basics:${merchantId}:latest`, BASICS_TTL_MS, () => withRetry(() => getMerchantBasics(deps, { merchantId })));
+const contextKey = (context?: SelectedContext) => context
+  ? [context.dayOfWeek, context.timeOfDay, context.weather, context.event].join(":") : "baseline";
+
+export function getCachedBasics(deps: IntelligenceDeps, merchantId: string, context?: SelectedContext): Promise<MerchantBasics> {
+  return cached(`basics:${merchantId}:latest:${contextKey(context)}`, BASICS_TTL_MS, () => withRetry(() => getMerchantBasics(deps, { merchantId, context })));
 }
 
 /** AI summary for the latest period, cached only when it actually generated. */
-export async function getCachedExplanation(deps: IntelligenceDeps, merchantId: string): Promise<MerchantExplanation> {
-  const basics = await getCachedBasics(deps, merchantId);
+export async function getCachedExplanation(deps: IntelligenceDeps, merchantId: string, context?: SelectedContext): Promise<MerchantExplanation> {
+  const basics = await getCachedBasics(deps, merchantId, context);
   return cached(
-    `explanation:${merchantId}:${basics.period.current.to}`,
+    `explanation:${merchantId}:${basics.period.current.to}:${contextKey(context)}`,
     EXPLANATION_TTL_MS,
     () => explainMerchant(deps, basics),
     // Keep only AI-written summaries; a fallback is retried on the next open.

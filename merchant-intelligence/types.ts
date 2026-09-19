@@ -130,6 +130,8 @@ export interface MerchantBasics {
   m2m: M2MIntelligence;
   relevance: RelevantIntelligence;
   recommendation: RecommendationResult;
+  /** For a what-if scenario: whether it calls for an offer email (see contextActionSupported). */
+  contextAction: { supported: boolean } | null;
   services: {
     llm: { configured: boolean; provider: string; model: string };
     memory: { configured: boolean; provider: string };

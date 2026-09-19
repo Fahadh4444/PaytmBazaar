@@ -398,9 +398,13 @@ export default function MerchantDialog({
                 <span>Simulation insight</span>
                 <strong>{simulationAction}</strong>
                 <small>This is a suggested response only. The workflow runs only after you explicitly approve below.</small>
-                <button type="button" className={styles.rerunButton} onClick={notifyFromSimulation} disabled={simulationActionState !== "idle" || simulation.m2m.contextImpact.forecast.confidence === "insufficient"}>
-                  {simulationActionState === "running" ? "Sending…" : simulationActionState === "done" ? "Email sent" : "Approve and email customers"}
-                </button>
+                {simulation.contextAction?.supported ? (
+                  <button type="button" className={styles.rerunButton} onClick={notifyFromSimulation} disabled={simulationActionState !== "idle"}>
+                    {simulationActionState === "running" ? "Sending…" : simulationActionState === "done" ? "Email sent" : "Approve and email customers"}
+                  </button>
+                ) : (
+                  <small>No offer email is suggested for this scenario.</small>
+                )}
                 {simulationActionResult && <p>{simulationActionResult}</p>}
               </section>
               <p className={styles.simulationSummary}>Why the model reached this result</p>

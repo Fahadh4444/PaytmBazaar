@@ -18,7 +18,7 @@ import { z } from "zod";
 import type { MerchantMemory } from "@/lib/cognee";
 import type { PromotionParameters } from "@/lib/n8n";
 import { ActionNotFoundError, type MerchantActionRecord } from "@/lib/paytm/adapter/actions";
-import { analyzeMerchant, type DateRange } from "@/m2m-engine";
+import { analyzeMerchant, type DateRange, type SelectedContext } from "@/m2m-engine";
 import type { RelevantIntelligence } from "@/relevance-engine";
 
 import { actionStoreUnavailable, approvalRequired, invalidActionState } from "./errors";
@@ -31,6 +31,48 @@ import type {
   MemoryWriteStatus,
   ProposedAction,
 } from "./types";
+
+/** How far behind similar shops (in points) a scenario must be before an offer is worth emailing. */
+export const CONTEXT_ACTION_GAP_PP = 5;
+
+type ScenarioForecast = {
+  direction: "increase" | "decrease" | "steady" | "unknown";
+  relativeToPeersPp: number | null;
+  confidence: "high" | "medium" | "low" | "insufficient";
+};
+
+/**
+ * The single rule for whether a what-if scenario calls for an offer email:
+ * the forecast must be reliable, and either demand is expected to rise or
+ * the merchant trails similar shops in that window. The dialog and the action
+ * route both use this, so the button and the server always agree.
+ */
+export function contextActionSupported(forecast: ScenarioForecast | null | undefined): boolean {
+  if (!forecast || forecast.confidence === "insufficient") return false;
+  return forecast.direction === "increase" || (forecast.relativeToPeersPp ?? 0) < -CONTEXT_ACTION_GAP_PP;
+}
+
+/** The offer a supported scenario sends: one day, in the chosen time window, by email. */
+export function proposeScenarioAction(
+  relevance: RelevantIntelligence,
+  forecast: ScenarioForecast | null | undefined,
+  context: SelectedContext,
+): ProposedAction | null {
+  if (!contextActionSupported(forecast)) return null;
+  const network = proposeAction(relevance);
+  return {
+    type: "SCHEDULE_PROMOTION",
+    parameters: { targetSegment: context.timeOfDay, durationDays: 1, channel: "email" },
+    description: `Email opted-in customers about a ${context.timeOfDay} offer.`,
+    basis: {
+      opportunityType: network?.basis.opportunityType ?? "CAPTURE_CONTEXT_DEMAND",
+      signalIds: network?.basis.signalIds ?? [],
+      period: relevance.period.current,
+      topPriority: relevance.topPriority,
+      context,
+    },
+  };
+}
 
 /** Opportunities an evening/all-day promotion can reasonably address. */
 const ACTIONABLE = new Set(["CLOSE_NETWORK_GAP", "CAPTURE_CONTEXT_DEMAND"]);

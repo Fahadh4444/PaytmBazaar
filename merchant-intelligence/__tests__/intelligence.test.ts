@@ -698,3 +698,27 @@ describe("long conversations and transient failures", () => {
     assert.equal(followUpQuestions([], true)[0], "Tell me about the suggested offer");
   });
 });
+
+// --- what-if scenario offers ----------------------------------------------------------------------
+
+describe("scenario offer emails", () => {
+  it("one rule decides when a scenario calls for an offer email", async () => {
+    const { contextActionSupported } = await import("@/merchant-intelligence/actions");
+    const f = (direction: "increase" | "decrease" | "steady" | "unknown", relativeToPeersPp: number | null, confidence: "high" | "insufficient" = "high") => ({ direction, relativeToPeersPp, confidence });
+    assert.equal(contextActionSupported(f("increase", 0)), true, "rising demand");
+    assert.equal(contextActionSupported(f("steady", -8)), true, "behind similar shops in this window");
+    assert.equal(contextActionSupported(f("steady", -3)), false, "small gap is noise");
+    assert.equal(contextActionSupported(f("increase", 0, "insufficient")), false, "unreliable forecast");
+    assert.equal(contextActionSupported(null), false);
+  });
+
+  it("builds an email offer for the chosen time window even without a network-gap opportunity", async () => {
+    const { proposeScenarioAction } = await import("@/merchant-intelligence/actions");
+    const basics = await getMerchantBasics(deps(), { merchantId: "TARGET", current: CURRENT });
+    const context = { dayOfWeek: "saturday", timeOfDay: "evening", weather: "clear", event: "none" } as const;
+    const offer = proposeScenarioAction({ ...basics.relevance, relevantOpportunities: [] }, { direction: "increase", relativeToPeersPp: 0, confidence: "high" }, context)!;
+    assert.deepEqual(offer.parameters, { targetSegment: "evening", durationDays: 1, channel: "email" });
+    assert.equal(offer.basis.opportunityType, "CAPTURE_CONTEXT_DEMAND");
+    assert.equal(proposeScenarioAction(basics.relevance, { direction: "steady", relativeToPeersPp: 0, confidence: "high" }, context), null);
+  });
+});

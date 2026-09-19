@@ -17,7 +17,7 @@
 import { analyzeMerchant, lastNDays, type DateRange, type SelectedContext } from "@/m2m-engine";
 import { analyzeRelevance } from "@/relevance-engine";
 
-import { findReusable, proposeAction } from "./actions";
+import { contextActionSupported, findReusable, proposeAction } from "./actions";
 import { noMerchantData } from "./errors";
 import { buildFacts } from "./facts";
 import { generateInsight } from "./insight";
@@ -117,6 +117,7 @@ export async function getMerchantBasics(
     m2m,
     relevance,
     recommendation,
+    contextAction: input.context ? { supported: contextActionSupported(m2m.contextImpact?.forecast) } : null,
     services: {
       llm: { configured: deps.llm.isConfigured(), provider: deps.llm.name, model: deps.llmModel },
       memory: { configured: deps.memory.isConfigured(), provider: deps.memory.name },

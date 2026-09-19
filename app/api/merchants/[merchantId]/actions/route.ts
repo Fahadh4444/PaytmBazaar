@@ -1,5 +1,5 @@
 import { badRequest, errorResponse, readJson } from "@/app/api/_lib/errors";
-import { executeApprovedAction, getMerchantBasics, proposeAction } from "@/merchant-intelligence";
+import { executeApprovedAction, getMerchantBasics, proposeScenarioAction } from "@/merchant-intelligence";
 import { getIntelligenceDeps, onMerchantActionChanged } from "@/merchant-intelligence/server";
 import { contextFromValue } from "@/merchant-intelligence/context-request";
 
@@ -26,13 +26,13 @@ export async function POST(request: Request, { params }: { params: Promise<{ mer
       if (!deps.actions) return Response.json({ error: { code: "action_store_unavailable", message: "Action storage is not available." } }, { status: 503 });
       const context = contextFromValue(body.context);
       const basics = await getMerchantBasics(deps, { merchantId, context });
-      const candidate = proposeAction(basics.relevance);
-      if (!candidate) return badRequest("This simulation does not contain an actionable opportunity.");
+      const candidate = proposeScenarioAction(basics.relevance, basics.m2m.contextImpact?.forecast, context);
+      if (!candidate) return badRequest("This scenario doesn't call for an offer, so no email was sent.");
       const created = await deps.actions.create({
         merchantId,
         type: candidate.type,
-        parameters: { ...candidate.parameters, targetSegment: context.timeOfDay, durationDays: 1 },
-        description: `Email opted-in customers about the selected ${context.timeOfDay} offer.`,
+        parameters: { ...candidate.parameters },
+        description: candidate.description,
         basis: {
           ...candidate.basis,
           context,

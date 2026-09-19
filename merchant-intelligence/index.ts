@@ -13,7 +13,14 @@
 export * from "./types";
 export * from "./errors";
 export { analyzeMerchantIntelligence, DEFAULT_PERIOD_DAYS, explainMerchant, getMerchantBasics } from "./service";
-export { executeApprovedAction, measureActionOutcome, proposeAction, PROMOTION_DAYS } from "./actions";
+export {
+  contextActionSupported,
+  executeApprovedAction,
+  measureActionOutcome,
+  proposeAction,
+  proposeScenarioAction,
+  PROMOTION_DAYS,
+} from "./actions";
 export { buildFacts } from "./facts";
 export { getBazaarIntelligence, getCityIntelligence, loadNetwork, primaryCity, type NetworkSnapshot } from "./area";
 export { buildInsightPrompt, capConfidence, generateInsight, insightSchema, parseInsight, unsupportedFigures } from "./insight";

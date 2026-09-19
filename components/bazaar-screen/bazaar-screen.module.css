@@ -620,6 +620,124 @@
   font-size: 12px;
 }
 
+.contextImpact {
+  display: grid;
+  gap: 6px;
+  margin: 12px 0 18px;
+  padding: 14px 16px;
+  border: 1px solid rgba(11, 87, 208, 0.16);
+  border-radius: 14px;
+  background: rgba(235, 245, 255, 0.72);
+}
+
+.contextImpact p,
+.contextImpact small { margin: 0; }
+.contextImpact small { color: #59677b; }
+.contextOutlook {
+  display: grid;
+  gap: 4px;
+  margin: 4px 0;
+  padding: 10px 12px;
+  border-left: 3px solid #0b57d0;
+  background: rgba(255, 255, 255, 0.72);
+}
+.contextOutlook > span {
+  color: #0b57d0;
+  font-family: var(--font-geist-mono), ui-monospace, monospace;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+}
+.contextImpact[data-status="meaningful_change"] { border-color: rgba(12, 141, 103, 0.35); }
+.contextImpact[data-status="insufficient_evidence"] { background: rgba(248, 248, 248, 0.8); }
+.srOnly { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); }
+
+.viewTabs {
+  display: flex;
+  gap: 8px;
+  margin: 14px 0 18px;
+}
+
+.viewTabs button,
+.rerunButton {
+  padding: 10px 16px;
+  border: 1px solid rgba(11, 87, 208, 0.3);
+  border-radius: 999px;
+  background: #fff;
+  color: #0b57d0;
+  font: 700 11px/1 var(--font-geist-mono), ui-monospace, monospace;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  cursor: pointer;
+}
+
+.viewTabs button[aria-selected="true"] {
+  background: #0b57d0;
+  color: #fff;
+}
+
+.viewTabs button:disabled { cursor: wait; opacity: 0.65; }
+
+.simulationWorkspace {
+  padding: 28px;
+  border: 2px solid var(--ink);
+  border-radius: 18px;
+  background-color: #fff;
+  background-image: linear-gradient(rgba(25, 54, 100, 0.055) 1px, transparent 1px), linear-gradient(90deg, rgba(25, 54, 100, 0.055) 1px, transparent 1px);
+  background-size: 28px 28px;
+}
+
+.simulationSummary { margin: 20px 0 14px; font-size: 17px; }
+.forecastHero {
+  display: grid;
+  gap: 9px;
+  margin-top: 20px;
+  padding: 22px;
+  border: 2px solid #0b57d0;
+  background: linear-gradient(135deg, #0b57d0, #153476);
+  color: #fff;
+}
+.forecastHero > span { font: 700 10px/1 var(--font-geist-mono), ui-monospace, monospace; letter-spacing: 0.14em; text-transform: uppercase; opacity: 0.75; }
+.forecastHero > strong { font-size: clamp(25px, 3vw, 38px); letter-spacing: -0.035em; text-transform: capitalize; }
+.forecastHero p, .forecastHero small { margin: 0; }
+.forecastHero small { opacity: 0.72; }
+.forecastHero[data-confidence="insufficient"] { border-color: #7b8494; background: #596273; }
+.simulationRecommendation {
+  display: grid;
+  gap: 7px;
+  margin-top: 12px;
+  padding: 16px 18px;
+  border: 1px solid rgba(12, 141, 103, 0.35);
+  background: rgba(232, 250, 243, 0.92);
+}
+.simulationRecommendation > span { color: #087c4a; font: 700 10px/1 var(--font-geist-mono), ui-monospace, monospace; letter-spacing: 0.12em; text-transform: uppercase; }
+.simulationRecommendation > small { color: #53645e; }
+.chatAction { display: grid; gap: 7px; margin: 10px 0; padding: 12px; border: 1px solid rgba(12, 141, 103, 0.3); background: #eefbf5; }
+.chatAction > span { color: #087c4a; font: 700 10px/1 var(--font-geist-mono), ui-monospace, monospace; letter-spacing: 0.1em; text-transform: uppercase; }
+.chatAction > small { color: #53645e; }
+.simulationGrid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+.simulationCard {
+  display: grid;
+  gap: 8px;
+  min-height: 170px;
+  padding: 18px;
+  border: 1px solid rgba(13, 27, 62, 0.2);
+  background: rgba(255, 255, 255, 0.94);
+}
+.simulationCard[data-supported="true"] { border-top: 4px solid #0b57d0; }
+.simulationCard > span { color: #60708a; font: 700 10px/1 var(--font-geist-mono), ui-monospace, monospace; letter-spacing: 0.12em; text-transform: uppercase; }
+.simulationCard > strong { font-size: 22px; text-transform: capitalize; }
+.simulationCard p, .simulationCard small { margin: 0; }
+.simulationCard small, .simulationNote { color: #5c687b; }
+.simulationNote { margin: 16px 0; font-size: 12px; }
+
+@media (max-width: 760px) {
+  .viewTabs { flex-wrap: wrap; }
+  .simulationGrid { grid-template-columns: 1fr; }
+  .simulationWorkspace { padding: 18px; }
+}
+
 .metricGrid {
   display: grid;
   grid-template-columns: 1fr 1fr;

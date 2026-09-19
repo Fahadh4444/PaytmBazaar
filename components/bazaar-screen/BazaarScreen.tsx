@@ -147,6 +147,7 @@ export default function BazaarScreen({ bazaar }: { bazaar: Bazaar }) {
         bazaarId={bazaar.id}
         bazaarName={`${bazaar.name} Bazaar`}
         open={openShop !== null}
+        context={context}
         onClose={() => setOpenShop(null)}
       />
     </main>

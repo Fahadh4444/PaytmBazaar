@@ -33,6 +33,13 @@ export function buildFacts(
   };
 
   const { current, previous } = m2m.merchantMetrics;
+  for (const item of m2m.contextImpact?.evidence ?? []) {
+    const key = `selected_context.${item.dimension}.${item.segment}`;
+    add(`${key}.merchant_growth`, `Your sales change for the selected ${item.dimension}`, item.merchantGrowth, "percent");
+    add(`${key}.cohort_growth`, `Similar shops' sales change for the selected ${item.dimension}`, item.cohortGrowth, "percent");
+    add(`${key}.gap`, `Your gap to similar shops for the selected ${item.dimension}`, item.gapPp, "points");
+    add(`${key}.transactions`, `Your paid orders supporting the selected ${item.dimension}`, item.merchantTransactions, "count");
+  }
   const weekly = m2m.period.days === 7;
   const thisWeek = weekly ? "this week" : "this period";
   const lastWeek = weekly ? "last week" : "the period before";

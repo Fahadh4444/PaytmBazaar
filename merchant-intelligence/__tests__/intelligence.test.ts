@@ -105,6 +105,18 @@ describe("merchant intelligence orchestration", () => {
     const result = await analyzeMerchantIntelligence(deps(), { merchantId: "TARGET" });
     assert.deepEqual(result.period.current, { from: "2026-09-14", to: "2026-09-20" });
   });
+
+  it("keeps context simulations read-only until the merchant explicitly chooses an action", async () => {
+    const store = new InMemoryActionStore();
+    const result = await getMerchantBasics(deps({ actions: store }), {
+      merchantId: "TARGET",
+      current: CURRENT,
+      context: { dayOfWeek: "friday", timeOfDay: "evening", weather: "rain", event: "none" },
+    });
+    assert.equal(result.m2m.contextImpact?.status, "meaningful_change");
+    assert.equal(result.recommendation.status, "none");
+    assert.equal(store.records.size, 0);
+  });
 });
 
 // --- 2. integration: real Data Adapter → M2M → Relevance ----------------------------------
@@ -313,7 +325,7 @@ const request = {
   actionId: "a1",
   merchantId: "TARGET",
   type: "SCHEDULE_PROMOTION" as const,
-  parameters: { targetSegment: "evening" as const, durationDays: 7, channel: "paytm_merchant_notification" as const },
+  parameters: { targetSegment: "evening" as const, durationDays: 7, channel: "email" as const },
   description: "Run a 7-day evening promotion on Paytm.",
 };
 
@@ -321,6 +333,8 @@ describe("n8n ActionExecutor", () => {
   beforeEach(() => {
     process.env.N8N_BASE_URL = "https://n8n.test/";
     process.env.N8N_WEBHOOK_SECRET = "s3cret";
+    process.env.N8N_EMAIL_FROM = "bazaar@example.com";
+    process.env.N8N_EMAIL_RECIPIENT = "customer@example.com";
     delete process.env.N8N_WEBHOOK_URL;
   });
 
@@ -330,7 +344,10 @@ describe("n8n ActionExecutor", () => {
     const result = await n8nWebhookExecutor.execute(request);
     assert.equal(result.status, "executed");
     assert.equal(result.reference, "42");
-    assert.deepEqual(JSON.parse(calls[0].init.body as string), request);
+    assert.deepEqual(JSON.parse(calls[0].init.body as string), {
+      ...request,
+      delivery: { channel: "email", recipient: "customer@example.com", from: "bazaar@example.com" },
+    });
     assert.equal((calls[0].init.headers as Record<string, string>)["X-Bazaar-Secret"], "s3cret");
   });
 

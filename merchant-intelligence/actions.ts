@@ -59,7 +59,7 @@ export function proposeAction(relevance: RelevantIntelligence): ProposedAction |
 
   return {
     type: "SCHEDULE_PROMOTION",
-    parameters: { targetSegment, durationDays: PROMOTION_DAYS, channel: "paytm_merchant_notification" },
+    parameters: { targetSegment, durationDays: PROMOTION_DAYS, channel: "email" },
     description:
       targetSegment === "all_day"
         ? `Run a ${PROMOTION_DAYS}-day promotion on Paytm for all-day customers.`
@@ -69,6 +69,7 @@ export function proposeAction(relevance: RelevantIntelligence): ProposedAction |
       signalIds: [...new Set([...opportunity.signalIds, ...(timeSignal ? [timeSignal.id] : [])])],
       period: relevance.period.current,
       topPriority: relevance.topPriority,
+      context: relevance.contextImpact?.requested,
     },
   };
 }
@@ -77,7 +78,7 @@ const promotionSchema = z
   .object({
     targetSegment: z.enum(["morning", "afternoon", "evening", "night", "all_day"]),
     durationDays: z.number().int().min(1).max(30),
-    channel: z.literal("paytm_merchant_notification"),
+    channel: z.literal("email"),
   })
   .strict();
 
@@ -91,7 +92,8 @@ export function findReusable(records: MerchantActionRecord[], action: ProposedAc
       r.status !== "failed" &&
       r.type === action.type &&
       (r.parameters as Partial<PromotionParameters>).targetSegment === action.parameters.targetSegment &&
-      (r.basis as { period?: DateRange }).period?.to === action.basis.period.to,
+      (r.basis as { period?: DateRange }).period?.to === action.basis.period.to &&
+      JSON.stringify((r.basis as { context?: unknown }).context ?? null) === JSON.stringify(action.basis.context ?? null),
   );
 }
 

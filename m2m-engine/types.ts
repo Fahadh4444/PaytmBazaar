@@ -135,6 +135,52 @@ export type ContextDimension = "timeOfDay" | "dayOfWeek" | "weather" | "event";
 /** A bucket within a dimension, e.g. `evening`, `saturday`, `rain`, `festival`, or `none`. */
 export type ContextSegment = TimeOfDay | DayOfWeek | WeatherCondition | EventType | "none";
 
+/** Canonical context supplied by the UI/API. All values match stored/derived data. */
+export interface SelectedContext {
+  dayOfWeek: DayOfWeek;
+  timeOfDay: TimeOfDay;
+  weather: WeatherCondition;
+  event: EventType | "none";
+}
+
+export interface SelectedContextEvidence {
+  dimension: ContextDimension;
+  segment: ContextSegment;
+  merchantGrowth: number | null;
+  cohortGrowth: number | null;
+  gapPp: number | null;
+  merchantTransactions: number;
+  cohortTransactions: number | null;
+  cohortContributors: number;
+  supported: boolean;
+}
+
+export interface ContextImpact {
+  requested: SelectedContext;
+  /** The current engine can support each selected dimension, not a false four-way intersection. */
+  level: "single_dimensions" | "insufficient";
+  status: "meaningful_change" | "no_meaningful_change" | "insufficient_evidence";
+  evidence: SelectedContextEvidence[];
+  strongestDimension: ContextDimension | null;
+  message: string;
+  combined: {
+    basis: "exact_combination" | "dimension_model" | "insufficient";
+    merchantGrowth: number | null;
+    cohortGrowth: number | null;
+    gapPp: number | null;
+    merchantTransactions: number;
+    cohortTransactions: number | null;
+    cohortContributors: number;
+  };
+  forecast: {
+    direction: "increase" | "decrease" | "steady" | "unknown";
+    expectedChangePercent: number | null;
+    relativeToPeersPp: number | null;
+    confidence: "high" | "medium" | "low" | "insufficient";
+    insight: string;
+  };
+}
+
 export interface SegmentSide {
   currentGmv: number;
   previousGmv: number;
@@ -315,6 +361,7 @@ export interface M2MIntelligence {
   cityMetrics: GroupMetrics;
   comparisons: Comparison[];
   context: ContextAnalysis;
+  contextImpact?: ContextImpact | null;
   patterns: Pattern[];
   evidence: Evidence;
   bazaarImpact: BazaarImpact;

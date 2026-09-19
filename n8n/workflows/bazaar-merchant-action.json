@@ -18,7 +18,7 @@
     },
     {
       "parameters": {
-        "jsCode": "const action = $input.first().json.body;\nif (action.type !== 'SCHEDULE_PROMOTION') {\n  throw new Error('Unsupported action type: ' + action.type);\n}\nconst p = action.parameters;\nconst start = new Date();\nconst end = new Date(start.getTime() + p.durationDays * 86400000);\nreturn [{ json: {\n  actionId: action.actionId,\n  merchantId: action.merchantId,\n  promotion: {\n    segment: p.targetSegment,\n    channel: p.channel,\n    startsAt: start.toISOString(),\n    endsAt: end.toISOString(),\n    message: action.description\n  }\n} }];"
+        "jsCode": "const action = $input.first().json.body;\nif (action.type !== 'SCHEDULE_PROMOTION' || action.parameters.channel !== 'email') {\n  throw new Error('Unsupported action or delivery channel');\n}\nif (!action.delivery?.recipient || !action.delivery?.from) {\n  throw new Error('Email delivery addresses are missing');\n}\nconst p = action.parameters;\nconst start = new Date();\nconst end = new Date(start.getTime() + p.durationDays * 86400000);\nconst escapeHtml = (value) => String(value ?? '')\n  .replaceAll('&', '&amp;').replaceAll('<', '&lt;').replaceAll('>', '&gt;')\n  .replaceAll('\\\"', '&quot;').replaceAll(\"'\", '&#039;');\nconst description = escapeHtml(action.description || 'A special offer selected for you is on its way.');\nconst segment = escapeHtml(p.targetSegment || 'valued customers');\nconst duration = Math.max(1, Number(p.durationDays) || 1);\nconst dateFormat = new Intl.DateTimeFormat('en-IN', { day: 'numeric', month: 'short', year: 'numeric', timeZone: 'Asia/Kolkata' });\nconst startsOn = dateFormat.format(start);\nconst endsOn = dateFormat.format(end);\nconst subject = action.title && action.title !== 'Test customer email'\n  ? action.title\n  : 'A special offer is coming your way';\nconst html = `<!doctype html><html><body style=\"margin:0;padding:0;background:#f4f7fb;font-family:Arial,Helvetica,sans-serif;color:#10224a;\"><table role=\"presentation\" width=\"100%\" cellspacing=\"0\" cellpadding=\"0\" style=\"background:#f4f7fb;padding:28px 12px;\"><tr><td align=\"center\"><table role=\"presentation\" width=\"100%\" cellspacing=\"0\" cellpadding=\"0\" style=\"max-width:620px;background:#ffffff;border-radius:18px;overflow:hidden;box-shadow:0 8px 30px rgba(16,34,74,.10);\"><tr><td style=\"height:7px;background:linear-gradient(90deg,#00baf2,#0b5bd3);font-size:0;\">&nbsp;</td></tr><tr><td style=\"padding:30px 34px 18px;\"><div style=\"font-size:12px;line-height:18px;letter-spacing:2px;text-transform:uppercase;color:#0b5bd3;font-weight:700;\">Paytm Bazaar</div><h1 style=\"margin:10px 0 12px;font-size:30px;line-height:38px;color:#10224a;\">A little something for you</h1><p style=\"margin:0;font-size:17px;line-height:27px;color:#465674;\">${description}</p></td></tr><tr><td style=\"padding:8px 34px 24px;\"><table role=\"presentation\" width=\"100%\" cellspacing=\"0\" cellpadding=\"0\" style=\"background:#eef8ff;border:1px solid #c9e9fb;border-radius:14px;\"><tr><td style=\"padding:22px;\"><div style=\"font-size:12px;letter-spacing:1.5px;text-transform:uppercase;color:#0878bd;font-weight:700;\">Offer window</div><div style=\"margin-top:8px;font-size:19px;line-height:28px;color:#10224a;font-weight:700;\">${startsOn} – ${endsOn}</div><div style=\"margin-top:6px;font-size:14px;line-height:22px;color:#5b6982;\">Available for ${duration} day${duration === 1 ? '' : 's'} · Created for ${segment}</div></td></tr></table></td></tr><tr><td style=\"padding:0 34px 32px;\"><table role=\"presentation\" cellspacing=\"0\" cellpadding=\"0\"><tr><td style=\"border-radius:9px;background:#00baf2;\"><a href=\"https://paytm.com/\" style=\"display:inline-block;padding:14px 24px;color:#ffffff;text-decoration:none;font-size:15px;font-weight:700;\">Explore on Paytm</a></td></tr></table><p style=\"margin:22px 0 0;font-size:12px;line-height:19px;color:#7b879d;\">Offer availability may vary. Terms may apply.</p></td></tr><tr><td style=\"padding:18px 34px;background:#10224a;color:#c9d4e8;font-size:12px;line-height:19px;\">Sent by your Paytm Bazaar merchant · Powered by Merchant Intelligence</td></tr></table></td></tr></table></body></html>`;\nreturn [{ json: {\n  actionId: action.actionId, merchantId: action.merchantId,\n  recipient: action.delivery.recipient, from: action.delivery.from,\n  subject, html, message: action.description,\n  promotion: { segment: p.targetSegment, startsAt: start.toISOString(), endsAt: end.toISOString() }\n} }];"
       },
       "id": "5f0c7b1e-1a1e-4b7a-9c43-0d6f1b2a3c02",
       "name": "Schedule promotion",
@@ -28,20 +28,44 @@
     },
     {
       "parameters": {
+        "fromEmail": "={{ $json.from }}",
+        "toEmail": "={{ $json.recipient }}",
+        "subject": "={{ $json.subject }}",
+        "emailFormat": "html",
+        "html": "={{ $json.html }}",
+        "options": {
+          "appendAttribution": false
+        }
+      },
+      "id": "5f0c7b1e-1a1e-4b7a-9c43-0d6f1b2a3c04",
+      "name": "Send customer email",
+      "type": "n8n-nodes-base.emailSend",
+      "typeVersion": 2.1,
+      "position": [520, 0],
+      "credentials": {
+        "smtp": {
+          "id": "CONFIGURE_IN_N8N",
+          "name": "Paytm Bazaar SMTP"
+        }
+      }
+    },
+    {
+      "parameters": {
         "respondWith": "json",
-        "responseBody": "={{ { \"status\": \"executed\", \"reference\": $execution.id, \"detail\": \"Promotion scheduled: \" + $json.promotion.segment + \" until \" + $json.promotion.endsAt } }}",
+        "responseBody": "={{ { \"status\": \"executed\", \"reference\": $execution.id, \"detail\": \"Customer email sent\" } }}",
         "options": {}
       },
       "id": "5f0c7b1e-1a1e-4b7a-9c43-0d6f1b2a3c03",
       "name": "Confirm execution",
       "type": "n8n-nodes-base.respondToWebhook",
       "typeVersion": 1.1,
-      "position": [520, 0]
+      "position": [780, 0]
     }
   ],
   "connections": {
     "Bazaar action webhook": { "main": [[{ "node": "Schedule promotion", "type": "main", "index": 0 }]] },
-    "Schedule promotion": { "main": [[{ "node": "Confirm execution", "type": "main", "index": 0 }]] }
+    "Schedule promotion": { "main": [[{ "node": "Send customer email", "type": "main", "index": 0 }]] },
+    "Send customer email": { "main": [[{ "node": "Confirm execution", "type": "main", "index": 0 }]] }
   },
   "settings": { "executionOrder": "v1" }
 }

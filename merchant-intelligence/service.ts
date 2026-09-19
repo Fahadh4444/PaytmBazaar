@@ -14,7 +14,7 @@
  * intelligence only; without an executor the proposal is shown as pending.
  */
 
-import { analyzeMerchant, lastNDays, type DateRange } from "@/m2m-engine";
+import { analyzeMerchant, lastNDays, type DateRange, type SelectedContext } from "@/m2m-engine";
 import { analyzeRelevance } from "@/relevance-engine";
 
 import { findReusable, proposeAction } from "./actions";
@@ -45,7 +45,7 @@ async function latestPeriod(deps: IntelligenceDeps, merchantId: string): Promise
 /** Step 1: the numbers, priorities and proposed action. No AI, no memory. */
 export async function getMerchantBasics(
   deps: IntelligenceDeps,
-  input: { merchantId: string; current?: DateRange },
+  input: { merchantId: string; current?: DateRange; context?: SelectedContext },
 ): Promise<MerchantBasics> {
   const [merchantRecord, current] = await Promise.all([
     deps.dataSource.getMerchantWithBazaar(input.merchantId),
@@ -58,12 +58,14 @@ export async function getMerchantBasics(
     bazaar: { id: merchantRecord.bazaar.id, name: merchantRecord.bazaar.name, city: merchantRecord.bazaar.city },
   };
 
-  const m2m = await analyzeMerchant(deps.dataSource, { merchantId: merchant.mid, current });
+  const m2m = await analyzeMerchant(deps.dataSource, { merchantId: merchant.mid, current, context: input.context });
   const relevance = analyzeRelevance(m2m);
   const action = proposeAction(relevance);
 
   let recommendation: RecommendationResult = { status: "none", reason: "NO_ACTIONABLE_OPPORTUNITY" };
-  if (action) {
+  // Context requests are exploratory simulations. They may calculate a
+  // candidate, but must never create an approvable action merely by running.
+  if (action && !input.context) {
     let actionId: string | null = null;
     let persistence: "saved" | "reused" | "unavailable" = "unavailable";
     let actionStatus: "proposed" | "approved" | "executed" | null = null;
@@ -84,7 +86,10 @@ export async function getMerchantBasics(
             type: action.type,
             parameters: { ...action.parameters },
             description: action.description,
-            basis: { ...action.basis, situation: situationOf(relevance) },
+            basis: { ...action.basis, situation: situationOf(relevance, m2m.contextImpact ? {
+              requested: m2m.contextImpact.requested as unknown as Record<string, string>,
+              status: m2m.contextImpact.status,
+            } : undefined) },
           });
           actionId = saved.id;
           persistence = "saved";
@@ -138,7 +143,10 @@ export async function explainMerchant(deps: IntelligenceDeps, basics: MerchantBa
         merchantId: merchant.mid,
         kind: "insight",
         recordedAt: deps.now().toISOString(),
-        situation: situationOf(relevance),
+        situation: situationOf(relevance, m2m.contextImpact ? {
+          requested: m2m.contextImpact.requested as unknown as Record<string, string>,
+          status: m2m.contextImpact.status,
+        } : undefined),
         recommendation:
           insight.status === "generated"
             ? { action: insight.insight.recommendation.action, expectedOutcome: insight.insight.recommendation.expectedOutcome }
@@ -155,7 +163,7 @@ export async function explainMerchant(deps: IntelligenceDeps, basics: MerchantBa
 
 export async function analyzeMerchantIntelligence(
   deps: IntelligenceDeps,
-  input: { merchantId: string; current?: DateRange },
+  input: { merchantId: string; current?: DateRange; context?: SelectedContext },
 ): Promise<MerchantIntelligenceResult> {
   const basics = await getMerchantBasics(deps, input);
   return { ...basics, ...(await explainMerchant(deps, basics)) };

@@ -75,6 +75,8 @@ const SYSTEM_PROMPT = [
   "4. Never mention or guess at any other individual merchant. Comparable merchants are an anonymous group.",
   "5. The recommendation must describe `proposedAction` if one is given; do not invent a different action.",
   "6. If `history` is empty, set historicalContext to null. Otherwise say briefly how the past situation relates.",
+  "If selectedContext says insufficient_evidence, say that plainly and do not claim the selected combination changed demand.",
+  "Selected dimensions may be evaluated separately. Never describe them as a proven combined effect unless the payload says so.",
   "Keep it short: each text field one or two short sentences (under 300 characters), the title under 60 characters,",
   "3 to 5 evidence items, each note under 100 characters in the same plain words. Focus on what matters most, not every fact.",
   "summary: one line on how the shop is doing. whatIsHappening: what the numbers show. whyItMatters: why the owner should care.",
@@ -115,6 +117,7 @@ export function buildInsightPrompt(input: {
       priority: o.priority,
     })),
     proposedAction: action ? { type: action.type, parameters: action.parameters } : null,
+    selectedContext: m2m.contextImpact ?? null,
     history: memories.map((m, i) => ({
       ref: `history.${i}`,
       kind: m.kind,

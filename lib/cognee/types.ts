@@ -32,6 +32,8 @@ export interface MerchantMemory {
     cohortBasis: string;
     signals: MemorySignal[];
     patterns: string[];
+    context?: Record<string, string>;
+    contextStatus?: string;
   };
   recommendation?: { action: string; expectedOutcome: string };
   action?: { actionId: string; type: string; parameters: Record<string, unknown>; status: string };

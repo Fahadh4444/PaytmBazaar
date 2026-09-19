@@ -152,7 +152,7 @@ when that's set:
   "actionId": "…",
   "merchantId": "…",
   "type": "SCHEDULE_PROMOTION",
-  "parameters": { "targetSegment": "evening", "durationDays": 7, "channel": "paytm_merchant_notification" },
+  "parameters": { "targetSegment": "evening", "durationDays": 7, "channel": "email" },
   "description": "Run a 7-day evening promotion on Paytm."
 }
 ```

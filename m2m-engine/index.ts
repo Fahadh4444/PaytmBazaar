@@ -28,7 +28,7 @@ export {
   calculateCityMetrics,
   calculateCohortMetrics,
 } from "./groups";
-export { analyzeContext } from "./context";
+export { analyzeContext, combinedContextImpact, selectedContextImpact } from "./context";
 export { compare, compareWithNetwork, direction } from "./comparison";
 export { detectPatterns } from "./patterns";
 export { buildEvidence } from "./evidence";

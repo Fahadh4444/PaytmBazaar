@@ -324,6 +324,8 @@ describe("LLM output validation", () => {
 const request = {
   actionId: "a1",
   merchantId: "TARGET",
+  merchantName: "Target Cafe",
+  bazaarName: "Indiranagar Bazaar",
   type: "SCHEDULE_PROMOTION" as const,
   parameters: { targetSegment: "evening" as const, durationDays: 7, channel: "email" as const },
   description: "Run a 7-day evening promotion on Paytm.",

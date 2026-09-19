@@ -150,9 +150,12 @@ export async function executeApprovedAction(
     return { action: current, execution: null, pendingReason: "ACTION_EXECUTOR_NOT_CONFIGURED", memory: "unavailable" };
   }
 
+  const merchant = await deps.dataSource.getMerchantWithBazaar(record.merchantId);
   const execution = await deps.executor.execute({
     actionId: record.id,
     merchantId: record.merchantId,
+    merchantName: merchant.name,
+    bazaarName: merchant.bazaar.name,
     type: record.type,
     parameters,
     description: record.description.slice(0, 280),

@@ -20,6 +20,9 @@ export interface PromotionParameters {
 export interface ActionExecutionRequest {
   actionId: string;
   merchantId: string;
+  /** Customer-facing shop identity used in outbound communication. */
+  merchantName: string;
+  bazaarName: string;
   type: MerchantActionType;
   parameters: PromotionParameters;
   /** Short human-readable description, length-capped. */

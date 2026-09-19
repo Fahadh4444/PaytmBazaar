@@ -344,6 +344,7 @@ export default function CityScreen() {
         scope={{ kind: "bazaar", id: analyzing?.id ?? "" }}
         open={analyzing !== null}
         onClose={() => setAnalyzing(null)}
+        sceneContext={context}
       />
 
       <AnalysisDialog
@@ -352,6 +353,7 @@ export default function CityScreen() {
         scope={{ kind: "city" }}
         open={cityAnalysis}
         onClose={() => setCityAnalysis(false)}
+        sceneContext={context}
       />
     </main>
   );

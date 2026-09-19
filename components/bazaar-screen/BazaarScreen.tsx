@@ -139,6 +139,7 @@ export default function BazaarScreen({ bazaar }: { bazaar: Bazaar }) {
         scope={{ kind: "bazaar", id: bazaar.id }}
         open={pulseOpen}
         onClose={() => setPulseOpen(false)}
+        sceneContext={context}
       />
 
       <MerchantDialog
@@ -148,6 +149,7 @@ export default function BazaarScreen({ bazaar }: { bazaar: Bazaar }) {
         bazaarName={`${bazaar.name} Bazaar`}
         open={openShop !== null}
         onClose={() => setOpenShop(null)}
+        sceneContext={context}
       />
     </main>
   );

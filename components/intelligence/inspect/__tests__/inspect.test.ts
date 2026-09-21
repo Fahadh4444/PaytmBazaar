@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { describe, it } from "node:test";
 
-import { flowState, FLOW_STAGES } from "@/components/intelligence/inspect/flow";
+import { flowStages, flowState, FLOW_STAGES } from "@/components/intelligence/inspect/flow";
 import { buildTrace, type InspectSource } from "@/components/intelligence/inspect/source";
 import type { TraceModel, TraceStage } from "@/components/intelligence/inspect/trace";
 import { explainMerchant, getBazaarIntelligence, getCityIntelligence, getMerchantBasics, loadNetwork } from "@/merchant-intelligence";
@@ -236,6 +236,52 @@ describe("System Flow", () => {
     }
     assert.equal(state.approval.status, "waiting");
     assert.equal(state.n8n.status, "waiting");
+  });
+});
+
+describe("Deterministic deployment", () => {
+  const offline = async () => {
+    const { llm } = fakeLlm("never called", false);
+    const d = deps({ mode: "deterministic", llm, executor: fakeExecutor({}, true).executor, actions: new InMemoryActionStore() });
+    const basics = await getMerchantBasics(d, { merchantId: "TARGET", current: CURRENT });
+    const explanation = await explainMerchant(d, basics);
+    return { scope: "merchant" as const, basics, explanation, basicsLoading: false, explanationLoading: false, error: null };
+  };
+
+  it("names the rules as the author and never claims a model ran", async () => {
+    const source = await offline();
+    const trace = buildTrace(source, "t");
+    const explanation = stage(trace, "explanation");
+    assert.equal(explanation.label, "Explanation");
+    assert.match(explanation.summary, /No AI model was called/);
+    assert.match(row(explanation, "Written by")!, /rules/i);
+    assert.equal(row(explanation, "Raw transactions sent"), "None");
+  });
+
+  it("shows memory as off rather than broken, and keeps every figure", async () => {
+    const source = await offline();
+    const trace = buildTrace(source, "t");
+    assert.equal(stage(trace, "memory").status, "not_used");
+    assert.match(stage(trace, "memory").summary, /Off in this deployment/);
+    // The numbers are still the engines' own.
+    assert.equal(stage(trace, "metrics").calcs![1].result, "-18.0%");
+    const state = flowState(source);
+    assert.equal(state.cognee.status, "not_used");
+    assert.equal(state.llm.status, "ran");
+    assert.match(state.llm.detail, /No model was called/);
+    assert.equal(state.m2m.status, "ran", "the calculating half still runs");
+  });
+
+  it("describes the executor as recording, not sending", async () => {
+    const source = await offline();
+    assert.equal(row(stage(buildTrace(source, "t"), "action"), "Executor"), "Recorded in Bazaar · no external workflow");
+    const stages = flowStages("deterministic");
+    const executor = stages.find((s) => s.id === "n8n")!;
+    assert.equal(executor.name, "Action executor");
+    assert.ok(executor.doesNot.some((d) => /n8n or send an email/.test(d)));
+    // Full mode is untouched, so switching back needs no other change.
+    assert.equal(flowStages("full").find((s) => s.id === "n8n")!.name, "n8n workflow");
+    assert.deepEqual(flowStages("full"), FLOW_STAGES);
   });
 });
 

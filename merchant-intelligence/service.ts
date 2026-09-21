@@ -119,9 +119,11 @@ export async function getMerchantBasics(
     recommendation,
     contextAction: input.context ? { supported: contextActionSupported(m2m.contextImpact?.forecast) } : null,
     services: {
+      mode: deps.mode ?? "full",
       llm: { configured: deps.llm.isConfigured(), provider: deps.llm.name, model: deps.llmModel },
       memory: { configured: deps.memory.isConfigured(), provider: deps.memory.name },
       executor: { configured: deps.executor.isConfigured(), provider: deps.executor.name },
+      speech: { configured: deps.speechConfigured ?? false },
     },
   };
 }

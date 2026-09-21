@@ -9,6 +9,8 @@
  * the request never reached is shown as not used, never as having run.
  */
 
+import { publicBazaarMode, type BazaarMode } from "@/lib/mode";
+
 import type { InspectSource } from "./source";
 
 export type FlowStageId =
@@ -156,8 +158,64 @@ export const FLOW_STAGES: FlowStage[] = [
   },
 ];
 
+/**
+ * What deterministic mode replaces (see lib/mode.ts). The stages stay in the
+ * flow, described as they actually behave with no model, no memory and no
+ * external workflow. Switching `BAZAAR_MODE` back to `full` restores the
+ * descriptions above; nothing else here changes.
+ */
+const DETERMINISTIC: Partial<Record<FlowStageId, Partial<FlowStage>>> = {
+  cognee: {
+    kind: "Memory · off here",
+    tagline: "Off in this deployment: Bazaar keeps no history between visits.",
+    uses: [],
+    does: ["Nothing here: every analysis is made from the recorded sales alone"],
+    doesNot: ["Store anything about a shop", "Change any figure"],
+  },
+  llm: {
+    name: "Ask Bazaar",
+    kind: "Deterministic wording",
+    tagline: "Turns the calculated facts into plain answers, with no model in the loop.",
+    uses: ["The same fact table a model would be given", "What the question is about"],
+    does: [
+      "Answers about sales, how you compare, times of day, days of the week and offers",
+      "Copies every figure from the fact table, so wording and numbers always agree",
+      "Writes the summary shown above the chat",
+    ],
+    doesNot: ["Call any AI service in this deployment", "Calculate", "Invent a figure"],
+  },
+  n8n: {
+    name: "Action executor",
+    kind: "Automation · off here",
+    tagline: "An approved offer is recorded inside Bazaar; no workflow runs and no email is sent.",
+    uses: ["The structured action the merchant approved"],
+    does: ["Records the approval with a reference and a time, so the outcome can be measured"],
+    doesNot: ["Call n8n or send an email in this deployment", "Decide what to run"],
+  },
+  outcome: {
+    does: ["Compares the shop with similar shops after the action", "Saves the result to Supabase for the next analysis"],
+  },
+};
+
+/** The stages as they behave in `mode`. */
+export function flowStages(mode: BazaarMode): FlowStage[] {
+  if (mode === "full") return FLOW_STAGES;
+  return FLOW_STAGES.map((stage) => ({ ...stage, ...(DETERMINISTIC[stage.id] ?? {}) }));
+}
+
 /** The learning loop that closes the flow. */
 export const FLOW_LOOP = "Outcomes are saved to Supabase and Cognee, and recalled by the next analysis.";
+const FLOW_LOOP_DETERMINISTIC = "Outcomes are saved to Supabase, and the next analysis reads them back.";
+
+export const flowLoop = (mode: BazaarMode) => (mode === "full" ? FLOW_LOOP : FLOW_LOOP_DETERMINISTIC);
+
+/** Deterministic unless the server said otherwise for this merchant. */
+export function modeOf(source: InspectSource): BazaarMode {
+  if (source.scope === "merchant" && source.basics) return source.basics.services.mode;
+  return publicBazaarMode();
+}
+
+const OFF_HERE = "Off in this deployment. Everything Bazaar shows is calculated, not generated.";
 
 /**
  * `ran`: returned for this analysis. `running`: its request is still out.
@@ -181,9 +239,16 @@ export function flowState(source: InspectSource): FlowState {
 
   if (source.scope !== "merchant") {
     const noun = source.scope === "city" ? "city" : "Bazaar";
+    const off = publicBazaarMode() === "deterministic";
     for (const stage of FLOW_STAGES) {
       if (!AREA_ONLY.has(stage.id)) {
-        state[stage.id] = { status: "not_used", detail: `Not used for this analysis: the ${noun} view is aggregate-only.` };
+        state[stage.id] = {
+          status: "not_used",
+          detail:
+            off && (stage.id === "cognee" || stage.id === "llm" || stage.id === "n8n")
+              ? OFF_HERE
+              : `Not used for this analysis: the ${noun} view is aggregate-only.`,
+        };
       } else if (source.state === "loading") {
         state[stage.id] = { status: "running", detail: "Request in progress." };
       } else if (source.state === "error" || !source.data) {
@@ -233,9 +298,13 @@ export function flowState(source: InspectSource): FlowState {
       ? { status: "ran", detail: `Proposed: ${rec.action.description}` }
       : { status: "ran", detail: "No action proposed: nothing worth acting on." };
 
+  const deterministic = basics?.services.mode === "deterministic";
+
   // Memory and explanation arrive with the second request.
   const history = explanation?.history;
-  state.cognee = !basics
+  state.cognee = deterministic
+    ? { status: "not_used", detail: "Off in this deployment: nothing is remembered between visits." }
+    : !basics
     ? { status: "waiting", detail: "Runs after the numbers are ready." }
     : !history
       ? source.explanationLoading
@@ -254,7 +323,21 @@ export function flowState(source: InspectSource): FlowState {
           };
 
   const insight = explanation?.insight;
-  state.llm = !basics
+  const asked = source.live?.ask;
+  state.llm = deterministic
+    ? !basics
+      ? { status: "waiting", detail: "Runs after the numbers are ready." }
+      : !insight
+        ? source.explanationLoading
+          ? { status: "running", detail: "Writing the explanation from the facts." }
+          : { status: "unavailable", detail: "The explanation was not returned." }
+        : {
+            status: "ran",
+            detail: asked
+              ? `Wrote the summary and answered "${asked.question}" from the facts. No model was called.`
+              : `Wrote the summary from ${insight.status === "generated" ? insight.facts.length : 0} facts. No model was called.`,
+          }
+    : !basics
     ? { status: "waiting", detail: "Runs after the numbers are ready." }
     : !insight
       ? source.explanationLoading
@@ -292,12 +375,20 @@ export function flowState(source: InspectSource): FlowState {
         ? { status: "waiting", detail: "Waiting for the merchant to approve." }
         : { status: "unavailable", detail: "Cannot be approved: action storage is unavailable." };
     state.n8n = executed
-      ? { status: "ran", detail: "Executed the approved promotion." }
+      ? {
+          status: "ran",
+          detail: deterministic
+            ? "Recorded the approved offer inside Bazaar. No workflow ran and no email was sent."
+            : "Executed the approved promotion.",
+        }
       : failed
-        ? { status: "unavailable", detail: "The run was attempted and n8n reported a failure." }
+        ? { status: "unavailable", detail: "The run was attempted and the executor reported a failure." }
         : !proposed.executorConfigured
           ? { status: "unavailable", detail: approved ? "Not configured: the approval is saved as pending." : "Not configured: an approved action would be saved as pending." }
-          : { status: "waiting", detail: "Waiting for approval." };
+          : {
+            status: "waiting",
+            detail: deterministic ? "Waiting for approval; it will be recorded inside Bazaar." : "Waiting for approval.",
+          };
     const outcome = source.live?.measured ?? proposed.outcome;
     state.outcome = outcome
       ? { status: "ran", detail: "Measured after the action." }

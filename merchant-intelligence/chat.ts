@@ -24,7 +24,8 @@ import { analyzeRelevance, type RelevantIntelligence } from "@/relevance-engine"
 
 import { cached } from "./cache";
 import { noMerchantData } from "./errors";
-import { fallbackAnswer, keepSupported } from "./fallback";
+import { answerFromFacts } from "./answers";
+import { keepSupported } from "./fallback";
 import { buildFacts } from "./facts";
 import { PLAIN_LANGUAGE_RULES, stripFence, unsupportedFigures } from "./insight";
 import { rememberSafely, situationOf } from "./memory";
@@ -369,23 +370,29 @@ export async function askBazaar(deps: IntelligenceDeps, input: AskInput): Promis
     aiIssue,
   });
 
+  // Deterministic mode is the product, not a degraded model: no apology, and
+  // the answer is written for the question that was actually asked.
+  const deterministic = (deps.mode ?? "full") === "deterministic";
   const summary = (aiIssue: NonNullable<AskTrace["aiIssue"]>): AskResult => {
-    const intent = classifyQuestion(question);
-    const unavailable = aiIssue === "LLM_ERROR" || aiIssue === "LLM_NOT_CONFIGURED";
-    const answer = `${unavailable ? `${UNAVAILABLE_NOTE}\n\n` : ""}${fallbackAnswer(facts)}`;
+    const written = answerFromFacts(question, facts, ctx.action);
+    const intent = written.topic === "OFFER" ? "RECOMMENDATION" : classifyQuestion(question);
+    const stumbled = !deterministic && (aiIssue === "LLM_ERROR" || aiIssue === "LLM_NOT_CONFIGURED");
+    const answer = `${stumbled ? `${UNAVAILABLE_NOTE}\n\n` : ""}${written.answer}`;
+    const cited = new Set(written.factIds);
+    const model = deterministic ? "deterministic" : "none";
     return {
       status: "answered",
       answer,
       message: answer,
       language: "en-IN",
       intent,
-      evidence: facts.filter((f) => ["merchant.gmv.growth", "cohort.gmv.growth", "merchant.aov.current"].includes(f.id)),
+      evidence: facts.filter((f) => cited.has(f.id)),
       recommendation: null,
       action: intent === "RECOMMENDATION" ? offer : null,
       source: "summary",
       provider: "rules",
-      model: "none",
-      trace: trace("rules", "none", aiIssue),
+      model,
+      trace: trace("rules", model, aiIssue),
     };
   };
   if (!deps.llm.isConfigured()) return summary("LLM_NOT_CONFIGURED");

@@ -2,7 +2,7 @@
 
 import { useId, useState } from "react";
 
-import { FLOW_LOOP, FLOW_STAGES, flowState, type FlowStageId, type FlowStatus } from "./flow";
+import { flowLoop, flowStages, flowState, modeOf, type FlowStageId, type FlowStatus } from "./flow";
 import type { InspectSource } from "./source";
 import styles from "./inspect.module.css";
 
@@ -28,6 +28,8 @@ type SystemFlowProps = {
  */
 export default function SystemFlow({ source, onOpenTrace }: SystemFlowProps) {
   const state = flowState(source);
+  const mode = modeOf(source);
+  const stages = flowStages(mode);
   const [selected, setSelected] = useState<FlowStageId | null>("m2m");
   const base = useId();
   const noun = NOUN[source.scope];
@@ -37,6 +39,12 @@ export default function SystemFlow({ source, onOpenTrace }: SystemFlowProps) {
       <p className={styles.lede}>
         How Paytm Bazaar is built. Each stage is marked with what it did for this {noun}.
       </p>
+      {mode === "deterministic" && (
+        <p className={styles.modeNote}>
+          This deployment runs the calculating half only: every number and every word you see is worked out
+          from recorded sales by fixed rules. No AI model, no stored memory, and no outside workflow.
+        </p>
+      )}
 
       <ul className={styles.legend} aria-label="Legend">
         {(Object.keys(STATUS) as FlowStatus[]).map((status) => (
@@ -47,7 +55,7 @@ export default function SystemFlow({ source, onOpenTrace }: SystemFlowProps) {
       </ul>
 
       <ol className={styles.flow}>
-        {FLOW_STAGES.map((stage) => {
+        {stages.map((stage) => {
           const now = state[stage.id];
           const expanded = selected === stage.id;
           const panel = `${base}-${stage.id}`;
@@ -98,7 +106,7 @@ export default function SystemFlow({ source, onOpenTrace }: SystemFlowProps) {
       </ol>
 
       <p className={styles.loop}>
-        <span aria-hidden="true">↺</span> {FLOW_LOOP}
+        <span aria-hidden="true">↺</span> {flowLoop(mode)}
       </p>
 
       <p className={styles.switch}>

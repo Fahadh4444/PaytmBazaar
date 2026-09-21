@@ -20,6 +20,24 @@ Supabase ─► Data Adapter ─► M2M ─► Relevance ─► Merchant Intelli
                                      Outcome ─► Supabase + Cognee
 ```
 
+## Modes
+
+`BAZAAR_MODE` (`lib/mode.ts`) decides how much of this pipeline runs.
+
+- **`deterministic` (the default).** Data Adapter → M2M → Relevance →
+  recommendation, then wording written from the fact table by fixed rules
+  (`merchant-intelligence/answers.ts`, `fallback.ts`). `getLlmProvider`,
+  `getMemoryProvider` and `getSpeechProvider` report "not configured", and
+  `getActionExecutor` returns the recorded executor (`lib/n8n/recorded.ts`),
+  which stores an approved action inside Bazaar instead of calling a workflow.
+  Every figure is identical to full mode; only the author of the wording, the
+  memory and the external step differ.
+- **`full`.** Every configured integration below is used.
+
+The mode reaches the UI as `services.mode`, so the merchant dialog, the
+Intelligence Trace and the System Flow describe what actually ran rather than
+implying a missing feature.
+
 ## Layers and responsibilities
 
 | Layer | Where | Does | Never |

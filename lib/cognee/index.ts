@@ -2,6 +2,8 @@
 
 import "server-only";
 
+import { isDeterministic } from "@/lib/mode";
+
 import { cogneeProvider } from "./cognee";
 import type { MemoryProvider } from "./types";
 
@@ -65,6 +67,16 @@ export async function checkCogneeConnection(): Promise<CogneeConnectionStatus> {
 export * from "./types";
 export { cogneeProvider, merchantDataset } from "./cognee";
 
+/** Deterministic mode: nothing is remembered, and nothing is recalled. */
+export const offMemoryProvider: MemoryProvider = {
+  name: "off",
+  isConfigured: () => false,
+  async remember() {},
+  async recall() {
+    return [];
+  },
+};
+
 export function getMemoryProvider(): MemoryProvider {
-  return cogneeProvider;
+  return isDeterministic() ? offMemoryProvider : cogneeProvider;
 }

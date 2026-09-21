@@ -565,6 +565,9 @@ export function buildMerchantTrace(input: MerchantTraceInput): TraceModel {
   const cur = mm.current;
   const prev = mm.previous;
   const cohortCmp = m2m.comparisons.find((c) => c.against === "cohort");
+  // Deterministic deployment: rules do the wording, nothing is remembered, and
+  // an approved action is recorded rather than sent anywhere.
+  const deterministic = services.mode === "deterministic";
   const stages: TraceStage[] = [];
 
   // Context
@@ -788,11 +791,22 @@ export function buildMerchantTrace(input: MerchantTraceInput): TraceModel {
             { label: "Signals", value: count(recommendation.action.basis.signalIds.length) },
           ]
         : undefined,
-    note: "Chosen by a fixed rule from the relevance result. The LLM words it but does not choose it.",
+    note: deterministic
+      ? "Chosen by a fixed rule from the relevance result above, and worded by the same rules."
+      : "Chosen by a fixed rule from the relevance result. The LLM words it but does not choose it.",
   });
 
   // Memory (Cognee)
   const history = explanation?.history;
+  if (deterministic) {
+    stages.push({
+      id: "memory",
+      label: "Memory",
+      status: "not_used",
+      summary: "Off in this deployment: Bazaar remembers nothing between visits.",
+      note: "Every figure above comes from the recorded sales of this period alone, so the same week always gives the same answer.",
+    });
+  } else
   stages.push(
     !history
       ? input.explanationLoading
@@ -825,24 +839,28 @@ export function buildMerchantTrace(input: MerchantTraceInput): TraceModel {
   if (!insight) {
     stages.push(
       input.explanationLoading
-        ? pending("explanation", "AI explanation", "Generating explanation from structured intelligence…")
-        : { id: "explanation", label: "AI explanation", status: "unavailable", summary: "The explanation was not returned." },
+        ? pending("explanation", deterministic ? "Explanation" : "AI explanation", "Writing the explanation from the calculated facts…")
+        : { id: "explanation", label: deterministic ? "Explanation" : "AI explanation", status: "unavailable", summary: "The explanation was not returned." },
     );
   } else if (insight.status === "generated") {
     const factById = new Map(insight.facts.map((f) => [f.id, f]));
     stages.push({
       id: "explanation",
-      label: "AI explanation",
+      label: deterministic ? "Explanation" : "AI explanation",
       status: "done",
-      summary:
-        insight.source === "ai"
+      summary: deterministic
+        ? `Bazaar wrote the explanation from ${insight.facts.length} calculated facts. No AI model was called.`
+        : insight.source === "ai"
           ? `${insight.model} explained the result using ${insight.facts.length} structured facts.`
           : `Rule-based wording used (${insight.aiIssue === "LLM_NOT_CONFIGURED" ? "LLM not configured" : "the model's reply failed the checks"}).`,
       rows: [
         { label: "Input", value: `${insight.facts.length} facts from M2M, Relevance and memory` },
         { label: "Raw transactions sent", value: "None" },
         { label: "Other shops' identities sent", value: "None" },
-        { label: "Written by", value: insight.source === "ai" ? `${insight.provider} · ${insight.model}` : "Rules (fallback)" },
+        {
+          label: "Written by",
+          value: deterministic ? "Bazaar's rules, from the fact table" : insight.source === "ai" ? `${insight.provider} · ${insight.model}` : "Rules (fallback)",
+        },
         { label: "Confidence", value: insight.insight.recommendation.confidence },
       ],
       groups: [
@@ -865,14 +883,16 @@ export function buildMerchantTrace(input: MerchantTraceInput): TraceModel {
                 : "—",
             };
           }),
-          note: "Every figure in the wording is checked against the fact table; a reply with any other figure is rejected.",
+          note: deterministic
+            ? "Each figure is copied from the fact table, so the wording and the numbers can never disagree."
+            : "Every figure in the wording is checked against the fact table; a reply with any other figure is rejected.",
         },
       ],
     });
   } else {
     stages.push({
       id: "explanation",
-      label: "AI explanation",
+      label: deterministic ? "Explanation" : "AI explanation",
       status: "unavailable",
       summary:
         insight.status === "unavailable"
@@ -885,7 +905,7 @@ export function buildMerchantTrace(input: MerchantTraceInput): TraceModel {
 
   // Ask Bazaar: the latest conversational answer
   const ask = input.live?.ask;
-  if (ask) stages.push(askStage(ask));
+  if (ask) stages.push(askStage(ask, deterministic));
 
   // Action
   const live = input.live;
@@ -900,7 +920,9 @@ export function buildMerchantTrace(input: MerchantTraceInput): TraceModel {
       label: "Action",
       status: "done",
       summary: executed
-        ? "Approved by the merchant and executed by n8n."
+        ? deterministic
+          ? "Approved by the merchant and recorded inside Bazaar."
+          : "Approved by the merchant and executed by n8n."
         : failed
           ? "Approved, but n8n reported the run failed."
           : approvedPending
@@ -914,7 +936,10 @@ export function buildMerchantTrace(input: MerchantTraceInput): TraceModel {
           label: "Status",
           value: executed ? "Executed" : failed ? "Failed" : approvedPending ? "Approved, pending" : (recommendation.actionStatus ?? "Not saved"),
         },
-        { label: "Executor", value: `n8n · ${services.executor.configured ? "configured" : "not configured"}` },
+        {
+          label: "Executor",
+          value: deterministic ? "Recorded in Bazaar · no external workflow" : `n8n · ${services.executor.configured ? "configured" : "not configured"}`,
+        },
         ...(recommendation.execution ? [{ label: "Ran on", value: shortDate(recommendation.execution.executedAt.slice(0, 10)) }] : []),
         ...(approval?.execution?.reference ? [{ label: "n8n reference", value: approval.execution.reference }] : []),
         ...(outcome
@@ -926,7 +951,9 @@ export function buildMerchantTrace(input: MerchantTraceInput): TraceModel {
             ]
           : []),
       ],
-      note: "n8n receives only the structured action above, never LLM text. Outcomes come from demo data and do not prove the offer caused them.",
+      note: deterministic
+        ? "The approval is stored with the structured action above; nothing is emailed or sent outside Bazaar. Outcomes come from demo data and do not prove the offer caused them."
+        : "n8n receives only the structured action above, never LLM text. Outcomes come from demo data and do not prove the offer caused them.",
     });
   } else {
     stages.push({
@@ -975,17 +1002,24 @@ function factText(f: AskResult["evidence"][number]): string {
 }
 
 /** The latest Ask Bazaar turn: which intelligence it used and how the wording was produced and checked. */
-function askStage(ask: AskResult & { question: string }): TraceStage {
+function askStage(ask: AskResult & { question: string }, deterministic: boolean): TraceStage {
   const t = ask.trace;
-  const wordedBy = ask.source === "summary" ? "Rules (fallback)" : `${providerName(ask.provider)} · ${ask.model}`;
+  const wordedBy =
+    ask.source !== "summary"
+      ? `${providerName(ask.provider)} · ${ask.model}`
+      : deterministic
+        ? "Bazaar's rules, from the fact table"
+        : "Rules (fallback)";
   return {
     id: "ask",
     label: "Ask Bazaar",
     status: "done",
     summary:
-      ask.source === "summary"
-        ? "Answered from the structured facts by rules; nothing was made up in place of the model."
-        : `${providerName(ask.provider)} turned ${t.factsSent} structured facts into a ${t.input === "voice" ? "spoken" : "written"} answer.`,
+      ask.source !== "summary"
+        ? `${providerName(ask.provider)} turned ${t.factsSent} structured facts into a ${t.input === "voice" ? "spoken" : "written"} answer.`
+        : deterministic
+          ? `Answered from ${t.factsSent} calculated facts by rules. No AI model was called.`
+          : "Answered from the structured facts by rules; nothing was made up in place of the model.",
     rows: [
       { label: "Question", value: ask.question.length > 80 ? `${ask.question.slice(0, 80)}…` : ask.question },
       { label: "Asked by", value: t.input === "voice" ? "Voice (Sarvam speech-to-text)" : "Typing" },
@@ -993,7 +1027,7 @@ function askStage(ask: AskResult & { question: string }): TraceStage {
       { label: "Intent", value: ask.intent.toLowerCase() },
       { label: "Worded by", value: wordedBy },
       { label: "Checks", value: ASK_SOURCE[ask.source] },
-      ...(t.aiIssue ? [{ label: "Why", value: ASK_ISSUE[t.aiIssue] }] : []),
+      ...(t.aiIssue && !deterministic ? [{ label: "Why", value: ASK_ISSUE[t.aiIssue] }] : []),
       { label: "Facts sent", value: `${t.factsSent} (from M2M, Relevance and memory)` },
       { label: "Conversation sent", value: `Last ${t.turnsSent} turn${t.turnsSent === 1 ? "" : "s"}` },
       { label: "Memory", value: t.memory.status === "recalled" ? `${t.memory.used} past record${t.memory.used === 1 ? "" : "s"}` : t.memory.status === "not_requested" ? "Not used" : "Not available; answered without history" },

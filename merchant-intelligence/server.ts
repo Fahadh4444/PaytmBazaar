@@ -11,7 +11,9 @@ import { after } from "next/server";
 
 import { getMemoryProvider } from "@/lib/cognee";
 import { getLlmProvider, getLlmStatus } from "@/lib/llm";
+import { bazaarMode } from "@/lib/mode";
 import { getActionExecutor } from "@/lib/n8n";
+import { getSpeechProvider } from "@/lib/speech";
 import { getMerchantActionStore, getPaytmDataSource } from "@/lib/paytm";
 
 import { getBazaarIntelligence, getCityIntelligence, loadNetwork, type NetworkSnapshot } from "./area";
@@ -35,6 +37,8 @@ export function getIntelligenceDeps(): IntelligenceDeps {
     actions = null;
   }
   return {
+    mode: bazaarMode(),
+    speechConfigured: getSpeechProvider().isConfigured(),
     dataSource: getPaytmDataSource(),
     llm: getLlmProvider(),
     llmModel: getLlmStatus().model,

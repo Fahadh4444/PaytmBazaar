@@ -10,6 +10,8 @@
 
 import "server-only";
 
+import { isDeterministic } from "@/lib/mode";
+
 import { openRouterModel, openRouterProvider } from "./openrouter";
 import { sarvamModel, sarvamProvider } from "./sarvam";
 import { LlmError, type LlmProvider } from "./types";
@@ -69,7 +71,21 @@ export function withFallback(primary: LlmProvider, fallback: LlmProvider | null)
   };
 }
 
+/**
+ * Deterministic mode: no model is reachable. Callers already handle an
+ * unconfigured provider by wording the answer from the fact table, so this
+ * needs no special case anywhere else.
+ */
+export const offProvider: LlmProvider = {
+  name: "rules",
+  isConfigured: () => false,
+  async complete() {
+    throw new LlmError("No LLM in deterministic mode (set BAZAAR_MODE=full to use one).", "rules");
+  },
+};
+
 export function getLlmProvider(): LlmProvider {
+  if (isDeterministic()) return offProvider;
   const [primary, fallback] = chainNames();
   return withFallback(lookup(primary), fallback ? lookup(fallback) : null);
 }
@@ -81,6 +97,9 @@ export function isLlmConfigured(): boolean {
 
 /** Safe configuration metadata for diagnostics; never exposes provider secrets. */
 export function getLlmStatus() {
+  if (isDeterministic()) {
+    return { provider: "rules", configured: false, model: "deterministic", primary: "rules", fallback: null };
+  }
   const [primaryName, fallbackName] = chainNames();
   const primary = lookup(primaryName);
   // The provider that will be tried first.

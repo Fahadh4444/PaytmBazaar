@@ -4,6 +4,7 @@
  */
 
 import type { MemoryProvider, MerchantMemory } from "@/lib/cognee";
+import type { BazaarMode } from "@/lib/mode";
 import type { LlmProvider } from "@/lib/llm";
 import type { ActionExecutionResult, ActionExecutor, PromotionParameters } from "@/lib/n8n";
 import type { MerchantActionRecord, MerchantActionStore } from "@/lib/paytm/adapter/actions";
@@ -12,6 +13,15 @@ import type { RelevantIntelligence } from "@/relevance-engine";
 
 /** Everything the service talks to, injected so tests can replace any of it. */
 export interface IntelligenceDeps {
+  /**
+   * How much of Bazaar is switched on (see lib/mode.ts). In `deterministic`
+   * the wording is written by rules rather than by a model, and nothing is
+   * apologised for: that is the product, not a degraded one.
+   * Defaults to `full` so injected test doubles behave as before.
+   */
+  mode?: BazaarMode;
+  /** Whether voice input and spoken answers are available. */
+  speechConfigured?: boolean;
   dataSource: PaytmDataSource;
   llm: LlmProvider;
   /** Model identifier reported with generated insights. */
@@ -133,9 +143,12 @@ export interface MerchantBasics {
   /** For a what-if scenario: whether it calls for an offer email (see contextActionSupported). */
   contextAction: { supported: boolean } | null;
   services: {
+    /** `deterministic`: rules only, no LLM, memory, workflow or voice. */
+    mode: BazaarMode;
     llm: { configured: boolean; provider: string; model: string };
     memory: { configured: boolean; provider: string };
     executor: { configured: boolean; provider: string };
+    speech: { configured: boolean };
   };
 }
 

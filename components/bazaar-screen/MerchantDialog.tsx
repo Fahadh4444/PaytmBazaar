@@ -71,8 +71,17 @@ const factValue = (fact: AskResult["evidence"][number]) =>
         ? `${fact.value > 0 ? "+" : ""}${fact.value} pts`
         : fact.value.toLocaleString("en-IN");
 
+/** Who answered: the deterministic engine, or the model that was used. */
 const providerLabel = (provider?: string, model?: string) =>
-  !provider ? null : provider === "rules" ? "Summary mode" : provider === "sarvam" ? `Sarvam · ${model ?? "105B"}` : model ?? provider;
+  !provider
+    ? null
+    : provider === "rules"
+      ? model === "deterministic"
+        ? "Deterministic engine"
+        : "Summary mode"
+      : provider === "sarvam"
+        ? `Sarvam · ${model ?? "105B"}`
+        : model ?? provider;
 
 type BazaarMerchant = { mid: string; name: string; category: string };
 
@@ -364,7 +373,9 @@ export default function MerchantDialog({
       const started = outcome.execution?.status === "executed" || outcome.execution === null;
       setActionResult(
         outcome.execution?.status === "executed"
-          ? "Done! Your offer is live."
+          ? deterministic
+            ? "Approved. The offer is recorded in Bazaar; nothing was sent outside this demo."
+            : "Done! Your offer is live."
           : outcome.execution?.status === "failed"
             ? "Sorry, the offer could not be started. Your recommendation is saved; please try again."
             : "Approved. It will start once the offer service is connected.",
@@ -409,6 +420,11 @@ export default function MerchantDialog({
     recommendation?.status === "proposed" ? recommendation.execution?.executedAt ?? null : null;
   const running = recommendation?.status === "proposed" && (recommendation.actionStatus === "executed" || actionState === "done");
   const title = basics?.merchant.name ?? (shop ? shop.name : "Merchant");
+  // Deterministic deployment: rules write the wording, approvals are recorded
+  // inside Bazaar, and there is no voice. The copy says so rather than
+  // implying something is missing.
+  const deterministic = basics?.services.mode === "deterministic";
+  const voiceReady = basics?.services.speech.configured ?? false;
 
   const behaviour = (item: SelectedContextEvidence, label: string) => {
     if (!item.supported || item.merchantGrowth === null || item.cohortGrowth === null || item.gapPp === null) {
@@ -478,7 +494,11 @@ export default function MerchantDialog({
       if (!response.ok && response.status !== 502) throw new Error(body?.error?.message ?? "The email could not be sent.");
       if (body.execution?.status === "executed") {
         setSimulationActionState("done");
-        setSimulationActionResult("The approved email was sent by the n8n workflow.");
+        setSimulationActionResult(
+          deterministic
+            ? "Approved and recorded. In this demo Bazaar sends no email; the decision and its reason are stored."
+            : "The approved email was sent by the n8n workflow.",
+        );
       } else if (body.execution?.status === "failed") {
         setSimulationActionState("idle");
         setSimulationActionResult("The email workflow failed. Please try again.");
@@ -684,7 +704,7 @@ export default function MerchantDialog({
               {running ? (
                 <>
                   <p>
-                    <strong>Offer live</strong>
+                    <strong>{deterministic ? "Offer approved" : "Offer live"}</strong>
                     {executedAt ? ` since ${new Date(executedAt).toLocaleDateString("en-IN", { day: "numeric", month: "short" })}` : ""}.
                   </p>
                   {outcome ? (
@@ -735,9 +755,7 @@ export default function MerchantDialog({
             )}
             {basics && !summaryLoading && !insight && (
               <div className={styles.assistantMessage}>
-                {explanation?.insight.status === "unavailable"
-                  ? "The AI summary is not set up yet. Your numbers are on the left."
-                  : "The summary isn't ready right now. Your numbers are on the left — try again in a moment."}
+                {"The summary isn't ready right now. Your numbers are on the left — try again in a moment."}
               </div>
             )}
 
@@ -776,15 +794,17 @@ export default function MerchantDialog({
                     </ul>
                   )}
                   <div className={styles.answerTools}>
-                    <button
-                      type="button"
-                      className={styles.listenButton}
-                      onClick={() => listen(index)}
-                      aria-pressed={speaking?.index === index}
-                      disabled={speaking?.index === index && speaking.state === "loading"}
-                    >
-                      {speaking?.index === index ? (speaking.state === "loading" ? "Preparing…" : "■ Stop") : "🔊 Listen"}
-                    </button>
+                    {voiceReady && (
+                      <button
+                        type="button"
+                        className={styles.listenButton}
+                        onClick={() => listen(index)}
+                        aria-pressed={speaking?.index === index}
+                        disabled={speaking?.index === index && speaking.state === "loading"}
+                      >
+                        {speaking?.index === index ? (speaking.state === "loading" ? "Preparing…" : "■ Stop") : "🔊 Listen"}
+                      </button>
+                    )}
                     {message.language && message.language !== "en-IN" && <span>{LANGUAGE_NAMES[message.language]}</span>}
                     {message.provider === "rules" && <span>From your numbers</span>}
                   </div>
@@ -858,23 +878,25 @@ export default function MerchantDialog({
             </div>
           ) : (
             <form className={`${styles.chatComposer} ${styles.askComposer}`} onSubmit={sendMessage}>
-              <button
-                type="button"
-                className={styles.micButton}
-                onClick={() => {
-                  recorder.clearError();
-                  stopAudio();
-                  void recorder.start();
-                }}
-                disabled={!mid || chatLoading || recorder.state === "requesting"}
-                aria-label="Ask by voice"
-                title="Ask by voice"
-              >
-                <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden="true">
-                  <rect x="9" y="3" width="6" height="11" rx="3" />
-                  <path d="M5 11a7 7 0 0 0 14 0M12 18v3" />
-                </svg>
-              </button>
+              {voiceReady && (
+                <button
+                  type="button"
+                  className={styles.micButton}
+                  onClick={() => {
+                    recorder.clearError();
+                    stopAudio();
+                    void recorder.start();
+                  }}
+                  disabled={!mid || chatLoading || recorder.state === "requesting"}
+                  aria-label="Ask by voice"
+                  title="Ask by voice"
+                >
+                  <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden="true">
+                    <rect x="9" y="3" width="6" height="11" rx="3" />
+                    <path d="M5 11a7 7 0 0 0 14 0M12 18v3" />
+                  </svg>
+                </button>
+              )}
               <input
                 value={draft}
                 onChange={(event) => setDraft(event.target.value)}

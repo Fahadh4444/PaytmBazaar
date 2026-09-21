@@ -231,6 +231,8 @@ describe("provider fallback", () => {
 
   it("falls back from Sarvam to OpenRouter over the wire when Sarvam errors", async () => {
     const { getLlmProvider, getLlmStatus } = await import("@/lib/llm");
+    // The provider chain only exists in full mode; deterministic mode has no model.
+    process.env.BAZAAR_MODE = "full";
     process.env.SARVAM_API_KEY = "sk-test";
     process.env.OPENROUTER_API_KEY = "or-test";
     delete process.env.LLM_PROVIDER;
@@ -245,6 +247,7 @@ describe("provider fallback", () => {
 
     delete process.env.SARVAM_API_KEY;
     assert.equal(getLlmStatus().provider, "openrouter");
+    delete process.env.BAZAAR_MODE;
   });
 });
 
@@ -348,7 +351,8 @@ describe("structured response validation", () => {
     assert.equal(broken.requests.length, 2, "one retry");
     assert.equal(result.source, "summary");
     assert.equal(result.trace.aiIssue, "INVALID_RESPONSE");
-    assert.match(result.answer, /Here is what your numbers show/);
+    assert.match(result.answer, /Your sales fell 18%/, "answered from the facts");
+    assert.match(result.answer, /\*\*Try this:\*\*/);
 
     let turn = 0;
     const learns = fakeLlm((request) => (++turn === 1 ? "{oops" : groundedAsk()(request)));
@@ -586,6 +590,8 @@ describe("Sarvam speech", () => {
   });
 
   it("the voice route rejects bad input and says so when voice is not configured", async () => {
+    // Voice exists only in full mode; deterministic mode has no speech provider.
+    process.env.BAZAAR_MODE = "full";
     delete process.env.SARVAM_API_KEY;
     const { POST } = await import("@/app/api/merchants/[merchantId]/chat/voice/route");
     const params = { params: Promise.resolve({ merchantId: "PBZKOR006" }) };

@@ -505,7 +505,8 @@ describe("degraded operation", () => {
     const answer = await ask(stubborn.llm);
     assert.equal(answer.status, "answered");
     assert.equal(answer.source, "summary");
-    assert.match(answer.message, /Here is what your numbers show/);
+    assert.match(answer.message, /Your sales (rose|fell)/, "answered from the facts");
+    assert.match(answer.message, /\*\*Try this:\*\*/);
     assert.equal(stubborn.requests.length, 2, "one correction attempt");
     assert.match(stubborn.requests[1].messages.at(-1)!.content, /not in the facts: 55.5%/);
 

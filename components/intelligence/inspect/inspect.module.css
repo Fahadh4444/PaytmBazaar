@@ -113,6 +113,16 @@
   line-height: 1.45;
 }
 
+/* What this deployment actually runs: stated once, not apologised for. */
+.modeNote {
+  margin: 0;
+  padding: 9px 11px;
+  border-left: 4px solid var(--accent);
+  background: #f4f8ff;
+  font-size: 12.5px;
+  line-height: 1.5;
+}
+
 .note {
   margin: 8px 0 0;
   font-size: 12px;

@@ -2,6 +2,9 @@
 
 import "server-only";
 
+import { isDeterministic } from "@/lib/mode";
+
+import { recordedExecutor } from "./recorded";
 import type { ActionExecutor } from "./types";
 import { n8nWebhookExecutor } from "./webhook";
 
@@ -60,7 +63,9 @@ export async function checkN8nConnection(): Promise<N8nConnectionStatus> {
 
 export * from "./types";
 export { n8nWebhookExecutor, n8nWebhookUrl } from "./webhook";
+export { recordedExecutor, RECORDED_DETAIL } from "./recorded";
 
+/** Deterministic mode records approvals inside Bazaar instead of calling n8n. */
 export function getActionExecutor(): ActionExecutor {
-  return n8nWebhookExecutor;
+  return isDeterministic() ? recordedExecutor : n8nWebhookExecutor;
 }

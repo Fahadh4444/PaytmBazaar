@@ -45,6 +45,31 @@ npm run dev
 
 http://localhost:3000. No credentials are needed to start.
 
+## Deployment modes
+
+Bazaar runs in one of two modes, chosen by `BAZAAR_MODE` (see `lib/mode.ts`).
+
+| | `deterministic` (default) | `full` |
+| --- | --- | --- |
+| Figures | M2M + Relevance | the same, unchanged |
+| Wording | written from the fact table by fixed rules | Sarvam / OpenRouter, every figure checked |
+| Ask Bazaar | rule-based answers per question topic | conversational, multilingual, voice |
+| History | none | Cognee |
+| Approved action | recorded inside Bazaar | run by n8n (email) |
+
+Deterministic is the default so a deployment cannot quietly start calling a paid
+provider because a key happens to be present. Nothing is missing in that mode:
+every number and every sentence comes from the recorded sales, and the Trace and
+System Flow say exactly which stages ran.
+
+To switch the integrations back on, set both (the second is what the browser
+reads for its labels) and provide the keys:
+
+```bash
+BAZAAR_MODE=full
+NEXT_PUBLIC_BAZAAR_MODE=full
+```
+
 ## Layout
 
 ```
